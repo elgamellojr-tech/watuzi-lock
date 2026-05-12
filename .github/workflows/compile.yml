@@ -1,0 +1,20 @@
+name: Compilar Dylib para iOS
+on:
+  workflow_dispatch: # Esto nos permite activar la compilación manualmente con un botón
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Descargar Código
+      uses: actions/checkout@v4
+
+    - name: Compilar dylib
+      run: |
+        xcrun --sdk iphoneos clang -dynamiclib -framework UIKit -arch arm64 Lock.m -o Lock.dylib
+
+    - name: Subir archivo terminado
+      uses: actions/upload-artifact@v4
+      with:
+        name: Lock-Dylib
+        path: Lock.dylib
