@@ -39,7 +39,7 @@ static void init_domidios_lock() {
         [lock addAction:[UIAlertAction actionWithTitle:@"Activar" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
             NSString *key = lock.textFields.firstObject.text;
             
-            if ([key isEqualToString:@"WTDFGTHGUER"]) { // CAMBIA ESTO
+            if ([key isEqualToString:@"iosDOMIDIOS"]) { // CAMBIA ESTO
                 if (![prefs objectForKey:@"domidios_reg_date"]) {
                     [prefs setObject:[NSDate date] forKey:@"domidios_reg_date"];
                     [prefs synchronize];
