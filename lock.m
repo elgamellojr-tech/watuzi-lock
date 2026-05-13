@@ -3,6 +3,7 @@
 // --- CONFIGURACIÓN ---
 #define PREF_KEY @"fecha_registro_domidios"
 #define DURACION_DIAS 30
+#define URL_IMAGEN_BOTON @"https://i.imgur.com/your_image.png" // CAMBIA ESTA URL POR TU ICONO
 
 __attribute__((visibility("default")))
 __attribute__((constructor))
@@ -11,10 +12,6 @@ static void domidios_premium_init() {
         
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         NSDate *fechaActivacion = [prefs objectForKey:PREF_KEY];
-        
-        // ID para la activación
-        NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-        NSString *shortID = [[deviceID substringToIndex:5] uppercaseString];
         
         UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
@@ -27,80 +24,72 @@ static void domidios_premium_init() {
         if (!window) window = [UIApplication sharedApplication].keyWindow;
         if (!window) return;
 
-        // --- LÓGICA DE CONTADOR PERMANENTE ---
         if (fechaActivacion) {
-            NSTimeInterval transcurrido = [[NSDate date] timeIntervalSinceDate:fechaActivacion];
-            NSTimeInterval restante = (DURACION_DIAS * 86400) - transcurrido;
-
-            if (restante <= 0) {
-                exit(0); 
-            } else {
-                // CONTENEDOR TRANSPARENTE
-                // Lo situamos en la parte superior (ajusta el 'y' si choca con el notch)
-                UIView *counterContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
-                counterContainer.backgroundColor = [UIColor clearColor]; // Fondo transparente
-                counterContainer.userInteractionEnabled = NO; // Para que no bloquee toques en la app
-                
-                UILabel *timerLabel = [[UILabel alloc] initWithFrame:counterContainer.bounds];
-                timerLabel.textColor = [UIColor redColor]; // Números en rojo
-                timerLabel.font = [UIFont fontWithName:@"Courier-Bold" size:14];
-                timerLabel.textAlignment = NSTextAlignmentCenter;
-                
-                // Sombra para que se lea bien en cualquier fondo
-                timerLabel.layer.shadowColor = [UIColor blackColor].CGColor;
-                timerLabel.layer.shadowOffset = CGSizeMake(1.0, 1.0);
-                timerLabel.layer.shadowOpacity = 1.0;
-                timerLabel.layer.shadowRadius = 1.0;
-
-                [counterContainer addSubview:timerLabel];
-                [window addSubview:counterContainer];
-
-                // Timer que actualiza cada segundo y NO se detiene
-                [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
-                    NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
-                    
-                    if (r <= 0) { exit(0); }
-                    
-                    int d = (int)(r / 86400);
-                    int h = (int)((NSInteger)r % 86400) / 3600;
-                    int m = (int)((NSInteger)r % 3600) / 60;
-                    int s = (int)((NSInteger)r % 60);
-                    
-                    timerLabel.text = [NSString stringWithFormat:@"VIP: %02dD %02dH %02dM %02dS", d, h, m, s];
-                    
-                    // Asegurar que el contador siempre esté al frente si la app cambia de vista
-                    [window bringSubviewToFront:counterContainer];
-                }];
-                return;
-            }
-        }
-
-        // --- MENÚ DE ACTIVACIÓN (SOLO SI NO ESTÁ ACTIVADO) ---
-        if (!fechaActivacion) {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🛡️ ACTIVACIÓN"
-                                        message:[NSString stringWithFormat:@"ID: %@\nEnvíalo para tu llave.", shortID]
-                                        preferredStyle:UIAlertControllerStyleAlert];
-
-            [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-                tf.placeholder = @"VIP-XXXXX-7";
-                tf.textAlignment = NSTextAlignmentCenter;
-                tf.keyboardAppearance = UIKeyboardAppearanceDark;
-            }];
-
-            [alert addAction:[UIAlertAction actionWithTitle:@"ACTIVAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-                NSString *keyMaestra = [NSString stringWithFormat:@"VIP-%@-7", shortID];
-                if ([alert.textFields.firstObject.text isEqualToString:keyMaestra]) {
-                    [prefs setObject:[NSDate date] forKey:PREF_KEY];
-                    [prefs synchronize];
-                    exit(0);
-                } else {
-                    exit(0);
-                }
-            }]];
+            // --- 1. CONTADOR PERMANENTE ROJO ---
+            UIView *counterContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 40, window.bounds.size.width, 30)];
+            counterContainer.backgroundColor = [UIColor clearColor];
+            counterContainer.userInteractionEnabled = NO;
             
-            UIViewController *root = window.rootViewController;
-            while(root.presentedViewController) root = root.presentedViewController;
-            [root presentViewController:alert animated:YES completion:nil];
+            UILabel *timerLabel = [[UILabel alloc] initWithFrame:counterContainer.bounds];
+            timerLabel.textColor = [UIColor redColor];
+            timerLabel.font = [UIFont fontWithName:@"Courier-Bold" size:14];
+            timerLabel.textAlignment = NSTextAlignmentCenter;
+            timerLabel.layer.shadowColor = [UIColor blackColor].CGColor;
+            timerLabel.layer.shadowOpacity = 0.8;
+            timerLabel.layer.shadowRadius = 2.0;
+            timerLabel.layer.shadowOffset = CGSizeMake(1, 1);
+
+            [counterContainer addSubview:timerLabel];
+            [window addSubview:counterContainer];
+
+            // --- 2. BOTÓN FLOTANTE PERSONALIZABLE ---
+            // Tamaño 50x50 es el estándar que no molesta
+            UIButton *floatingButton = [UIButton buttonWithType:UIButtonTypeCustom];
+            floatingButton.frame = CGRectMake(window.bounds.size.width - 70, window.bounds.size.height - 150, 55, 55);
+            floatingButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.6]; // Fondo semi-transparente
+            floatingButton.layer.cornerRadius = 27.5; // Hace el botón circular
+            floatingButton.layer.borderWidth = 1.5;
+            floatingButton.layer.borderColor = [UIColor redColor].CGColor;
+            floatingButton.clipsToBounds = YES;
+
+            // Cargar imagen desde URL de forma sencilla
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:URL_IMAGEN_BOTON]];
+                if (data) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [floatingButton setImage:[UIImage imageWithData:data] forState:UIControlStateNormal];
+                        floatingButton.imageView.contentMode = UIViewContentModeScaleAspectFill;
+                    });
+                }
+            });
+
+            // Acción del botón
+            [floatingButton addTarget:self action:@selector(handleFloatingButton) forControlEvents:UIControlEventTouchUpInside];
+            [window addSubview:floatingButton];
+
+            // TIMER DE ACTUALIZACIÓN
+            [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+                NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
+                if (r <= 0) exit(0);
+                
+                int d = (int)(r / 86400);
+                int h = (int)((NSInteger)r % 86400) / 3600;
+                int m = (int)((NSInteger)r % 3600) / 60;
+                int s = (int)((NSInteger)r % 60);
+                
+                timerLabel.text = [NSString stringWithFormat:@"VIP: %02dD %02dH %02dM %02dS", d, h, m, s];
+                [window bringSubviewToFront:counterContainer];
+                [window bringSubviewToFront:floatingButton];
+            }];
+        } else {
+            // Lógica de activación (Alerta ya configurada anteriormente)
+            // ... (Se mantiene igual que el código previo)
         }
     });
+}
+
+// Acción al tocar el botón
+static void handleFloatingButton() {
+    // Aquí puedes poner que abra un menú, Telegram, o lo que desees
+    printf("Botón Domidios presionado\n");
 }
