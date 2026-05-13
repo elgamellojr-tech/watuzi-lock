@@ -18,16 +18,16 @@
     while(root.presentedViewController) root = root.presentedViewController;
 
     UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"🚀 iOS DOMIDIOS VIP" 
-                                message:@"Panel de Control" 
+                                message:@"Menú de Gestión" 
                                 preferredStyle:UIAlertControllerStyleActionSheet];
 
     [menu addAction:[UIAlertAction actionWithTitle:@"📱 Telegram" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/iOS_DOMIDIOS"] options:@{} completionHandler:nil];
     }]];
 
-    [menu addAction:[UIAlertAction actionWithTitle:@"ℹ️ Estado de Licencia" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [menu addAction:[UIAlertAction actionWithTitle:@"ℹ️ Info Licencia" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSDate *fecha = [[NSUserDefaults standardUserDefaults] objectForKey:PREF_KEY];
-        UIAlertController *info = [UIAlertController alertControllerWithTitle:@"INFO" 
+        UIAlertController *info = [UIAlertController alertControllerWithTitle:@"ESTADO" 
                                     message:[NSString stringWithFormat:@"Activado: %@", fecha] 
                                     preferredStyle:UIAlertControllerStyleAlert];
         [info addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
@@ -40,11 +40,10 @@
     [root presentViewController:menu animated:YES completion:nil];
 }
 
-// Lógica para arrastrar el botón por la pantalla
+// Lógica para mover el botón
 + (void)handlePan:(UIPanGestureRecognizer *)gesture {
     UIView *button = gesture.view;
     CGPoint translation = [gesture translationInView:button.superview];
-    
     button.center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
     [gesture setTranslation:CGPointZero inView:button.superview];
 }
@@ -69,7 +68,7 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fechaActivacion) {
-            // 1. CONTADOR PERMANENTE
+            // 1. CONTADOR SUPERIOR
             UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
@@ -78,32 +77,27 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FLOTANTE Y MOVIBLE
+            // 2. BOTÓN FLOTANTE (SIN IMAGEN)
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            btn.frame = CGRectMake(window.bounds.size.width - 70, window.bounds.size.height / 2, 60, 60);
-            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
-            btn.layer.cornerRadius = 30;
-            btn.layer.borderWidth = 1.5;
+            btn.frame = CGRectMake(window.bounds.size.width - 65, window.bounds.size.height / 2, 55, 55);
+            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.7];
+            btn.layer.cornerRadius = 27.5;
+            btn.layer.borderWidth = 2.0;
             btn.layer.borderColor = [UIColor redColor].CGColor;
-            btn.clipsToBounds = YES;
+            
+            // Texto en lugar de imagen
+            [btn setTitle:@"ID" forState:UIControlStateNormal];
+            btn.titleLabel.font = [UIFont boldSystemFontOfSize:18];
+            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
 
-            // Cargar la imagen "image.png"
-            UIImage *btnImg = [UIImage imageNamed:@"image.png"];
-            if (btnImg) {
-                [btn setImage:btnImg forState:UIControlStateNormal];
-                btn.imageView.contentMode = UIViewContentModeScaleAspectFill;
-            }
-
-            // Añadir gesto para moverlo
+            // Gestos
             UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[DomidiosManager class] action:@selector(handlePan:)];
             [btn addGestureRecognizer:pan];
-
-            // Acción de toque
             [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
             
             [window addSubview:btn];
 
-            // 3. TIMER
+            // 3. ACTUALIZACIÓN DE TIEMPO
             [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
                 NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
                 if (r <= 0) exit(0);
@@ -115,7 +109,7 @@ static void domidios_premium_init() {
                 [window bringSubviewToFront:btn];
             }];
         } else {
-            // Lógica de activación (ID y Alerta) se mantiene igual
+            // Lógica de activación estándar
             NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" message:[NSString stringWithFormat:@"ID: %@", shortID] preferredStyle:UIAlertControllerStyleAlert];
             [alert addTextFieldWithConfigurationHandler:nil];
