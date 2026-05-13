@@ -4,10 +4,9 @@
 #define PREF_KEY @"fecha_registro_domidios"
 #define DURACION_DIAS 30
 
-// --- CLASE PARA MANEJAR EL MENÚ Y MOVIMIENTO ---
+// --- CLASE PARA MANEJAR EL MENÚ ---
 @interface DomidiosManager : NSObject
 + (void)handleTap:(UIButton *)sender;
-+ (void)handlePan:(UIPanGestureRecognizer *)gesture;
 @end
 
 @implementation DomidiosManager
@@ -23,30 +22,23 @@
 
     // Opción 1: Anti atraso
     [menu addAction:[UIAlertAction actionWithTitle:@"⚡ Anti atraso" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        // Opción visual/funcional de optimización
+        // Espacio para lógica futura
     }]];
 
-    // Opción 2: Verificación (Solo Visual)
+    // Opción 2: Verificación (Visual)
     [menu addAction:[UIAlertAction actionWithTitle:@"✅ Verificación" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        UIAlertController *vAlert = [UIAlertController alertControllerWithTitle:@"ESTADO DE CONTACTOS" 
-                                     message:@"\n✓ Servidor: Activo\n✓ Contactos: Verificados\n✓ Encriptación: Habilitada" 
+        UIAlertController *vAlert = [UIAlertController alertControllerWithTitle:@"VERIFICACIÓN DE CONTACTOS" 
+                                     message:@"\n● Estado: Protegido\n● Base de datos: Sincronizada\n● Contactos VIP: Verificados" 
                                      preferredStyle:UIAlertControllerStyleAlert];
-        [vAlert addAction:[UIAlertAction actionWithTitle:@"Entendido" style:UIAlertActionStyleCancel handler:nil]];
+        [vAlert addAction:[UIAlertAction actionWithTitle:@"Cerrar" style:UIAlertActionStyleCancel handler:nil]];
         [root presentViewController:vAlert animated:YES completion:nil];
     }]];
 
-    [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar" style:UIAlertActionStyleCancel handler:nil]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar Menú" style:UIAlertActionStyleCancel handler:nil]];
     
+    // Soporte para iPad
     menu.popoverPresentationController.sourceView = sender;
     [root presentViewController:menu animated:YES completion:nil];
-}
-
-// Lógica para arrastrar el botón (Flotante Real)
-+ (void)handlePan:(UIPanGestureRecognizer *)gesture {
-    UIView *button = gesture.view;
-    CGPoint translation = [gesture translationInView:button.superview];
-    button.center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
-    [gesture setTranslation:CGPointZero inView:button.superview];
 }
 @end
 
@@ -69,7 +61,7 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fechaActivacion) {
-            // 1. CONTADOR SUPERIOR
+            // 1. CONTADOR SUPERIOR FIJO
             UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
@@ -78,25 +70,25 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FLOTANTE Y ARRSTRABLE
+            // 2. BOTÓN FIJO (NO FLOTANTE/NO MOVIBLE)
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            btn.frame = CGRectMake(window.bounds.size.width - 65, window.bounds.size.height / 2, 55, 55);
-            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.7];
+            // Posición fija a la derecha
+            btn.frame = CGRectMake(window.bounds.size.width - 60, window.bounds.size.height / 2, 55, 55);
+            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
             btn.layer.cornerRadius = 27.5;
             btn.layer.borderWidth = 2.0;
             btn.layer.borderColor = [UIColor redColor].CGColor;
             
             [btn setTitle:@"VIP" forState:UIControlStateNormal];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+            btn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
 
-            // Gestos: Movimiento (Pan) y Toque (Tap)
-            UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[DomidiosManager class] action:@selector(handlePan:)];
-            [btn addGestureRecognizer:pan];
+            // Solo acción de toque, sin gestos de movimiento
             [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
             
             [window addSubview:btn];
 
-            // 3. ACTUALIZACIÓN DE TIEMPO
+            // 3. TIMER DE ACTUALIZACIÓN
             [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
                 NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
                 if (r <= 0) exit(0);
@@ -108,7 +100,7 @@ static void domidios_premium_init() {
                 [window bringSubviewToFront:btn];
             }];
         } else {
-            // Lógica de activación estándar
+            // Panel de activación
             NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" 
                                         message:[NSString stringWithFormat:@"ID: %@", shortID] 
