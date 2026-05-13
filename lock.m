@@ -3,45 +3,50 @@
 // --- CONFIGURACIÓN ---
 #define PREF_KEY @"fecha_registro_domidios"
 #define DURACION_DIAS 30
-#define URL_BOTON @"https://i.imgur.com/G4Y5N12.png" // Tu icono
 
-// --- CLASE PARA MANEJAR EL MENÚ ---
-@interface DomidiosMenu : NSObject
-+ (void)showMenu:(UIView *)parent;
+// --- CLASE PARA MANEJAR EL MENÚ Y MOVIMIENTO ---
+@interface DomidiosManager : NSObject
++ (void)handleTap:(UIButton *)sender;
++ (void)handlePan:(UIPanGestureRecognizer *)gesture;
 @end
 
-@implementation DomidiosMenu
-+ (void)showMenu:(UIView *)parent {
-    // Obtenemos el RootViewController para presentar el menú
+@implementation DomidiosManager
+
+// Acción al tocar el botón
++ (void)handleTap:(UIButton *)sender {
     UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
     while(root.presentedViewController) root = root.presentedViewController;
 
-    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"🚀 OPCIONES AVANZADAS" 
-                                message:@"Panel de Control VIP" 
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"🚀 iOS DOMIDIOS VIP" 
+                                message:@"Panel de Control" 
                                 preferredStyle:UIAlertControllerStyleActionSheet];
 
-    // Opción 1: Telegram
-    [menu addAction:[UIAlertAction actionWithTitle:@"📱 Contactar Soporte" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [menu addAction:[UIAlertAction actionWithTitle:@"📱 Telegram" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/iOS_DOMIDIOS"] options:@{} completionHandler:nil];
     }]];
 
-    // Opción 2: Info de la Suscripción
-    [menu addAction:[UIAlertAction actionWithTitle:@"ℹ️ Info de Licencia" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [menu addAction:[UIAlertAction actionWithTitle:@"ℹ️ Estado de Licencia" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSDate *fecha = [[NSUserDefaults standardUserDefaults] objectForKey:PREF_KEY];
-        UIAlertController *info = [UIAlertController alertControllerWithTitle:@"LICENCIA" 
-                                    message:[NSString stringWithFormat:@"Activado el: %@", fecha] 
+        UIAlertController *info = [UIAlertController alertControllerWithTitle:@"INFO" 
+                                    message:[NSString stringWithFormat:@"Activado: %@", fecha] 
                                     preferredStyle:UIAlertControllerStyleAlert];
         [info addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
         [root presentViewController:info animated:YES completion:nil];
     }]];
 
-    // Opción 3: Cerrar Menú
     [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar" style:UIAlertActionStyleCancel handler:nil]];
-
-    // Soporte para iPad
-    menu.popoverPresentationController.sourceView = parent;
     
+    menu.popoverPresentationController.sourceView = sender;
     [root presentViewController:menu animated:YES completion:nil];
+}
+
+// Lógica para arrastrar el botón por la pantalla
++ (void)handlePan:(UIPanGestureRecognizer *)gesture {
+    UIView *button = gesture.view;
+    CGPoint translation = [gesture translationInView:button.superview];
+    
+    button.center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
+    [gesture setTranslation:CGPointZero inView:button.superview];
 }
 @end
 
@@ -64,7 +69,7 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fechaActivacion) {
-            // 1. CONTADOR PERMANENTE ROJO
+            // 1. CONTADOR PERMANENTE
             UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
@@ -73,55 +78,50 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FLOTANTE (MENÚ)
+            // 2. BOTÓN FLOTANTE Y MOVIBLE
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            btn.frame = CGRectMake(window.bounds.size.width - 60, window.bounds.size.height / 2, 50, 50);
-            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
-            btn.layer.cornerRadius = 25;
-            btn.layer.borderWidth = 1.0;
+            btn.frame = CGRectMake(window.bounds.size.width - 70, window.bounds.size.height / 2, 60, 60);
+            btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
+            btn.layer.cornerRadius = 30;
+            btn.layer.borderWidth = 1.5;
             btn.layer.borderColor = [UIColor redColor].CGColor;
             btn.clipsToBounds = YES;
 
-            // Cargar Imagen
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:URL_BOTON]];
-                if (data) dispatch_async(dispatch_get_main_queue(), ^{
-                    [btn setImage:[UIImage imageWithData:data] forState:UIControlStateNormal];
-                });
-            });
+            // Cargar la imagen "image.png"
+            UIImage *btnImg = [UIImage imageNamed:@"image.png"];
+            if (btnImg) {
+                [btn setImage:btnImg forState:UIControlStateNormal];
+                btn.imageView.contentMode = UIViewContentModeScaleAspectFill;
+            }
 
-            // Acción del Menú (Usando la clase estática)
-            [btn addTarget:[DomidiosMenu class] action:@selector(showMenu:) forControlEvents:UIControlEventTouchUpInside];
+            // Añadir gesto para moverlo
+            UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[DomidiosManager class] action:@selector(handlePan:)];
+            [btn addGestureRecognizer:pan];
+
+            // Acción de toque
+            [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
+            
             [window addSubview:btn];
 
-            // 3. ACTUALIZACIÓN CADA SEGUNDO
+            // 3. TIMER
             [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
                 NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
                 if (r <= 0) exit(0);
                 
-                int d = (int)(r / 86400);
-                int h = (int)((NSInteger)r % 86400) / 3600;
-                int m = (int)((NSInteger)r % 3600) / 60;
-                int s = (int)((NSInteger)r % 60);
-                
+                int d = (int)(r / 86400), h = (int)((NSInteger)r % 86400) / 3600, m = (int)((NSInteger)r % 3600) / 60, s = (int)((NSInteger)r % 60);
                 timerLabel.text = [NSString stringWithFormat:@"VIP: %02dD %02dH %02dM %02dS", d, h, m, s];
+                
                 [window bringSubviewToFront:cView];
                 [window bringSubviewToFront:btn];
             }];
         } else {
-            // Lógica de Activación (ID y Alerta)
-            NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-            NSString *shortID = [[deviceID substringToIndex:5] uppercaseString];
-            
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" 
-                                        message:[NSString stringWithFormat:@"ID: %@", shortID] 
-                                        preferredStyle:UIAlertControllerStyleAlert];
+            // Lógica de activación (ID y Alerta) se mantiene igual
+            NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" message:[NSString stringWithFormat:@"ID: %@", shortID] preferredStyle:UIAlertControllerStyleAlert];
             [alert addTextFieldWithConfigurationHandler:nil];
-            [alert addAction:[UIAlertAction actionWithTitle:@"VERIFICAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            [alert addAction:[UIAlertAction actionWithTitle:@"ACTIVAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
                 if ([alert.textFields.firstObject.text isEqualToString:[NSString stringWithFormat:@"VIP-%@-7", shortID]]) {
-                    [prefs setObject:[NSDate date] forKey:PREF_KEY];
-                    [prefs synchronize];
-                    exit(0);
+                    [prefs setObject:[NSDate date] forKey:PREF_KEY]; [prefs synchronize]; exit(0);
                 } else { exit(0); }
             }]];
             UIViewController *root = window.rootViewController;
