@@ -20,65 +20,124 @@
 }
 
 - (void)abrirExplorador {
+    // Forzamos carga de librerías justo antes de usarlas
     dlopen("/System/Library/Frameworks/AVFoundation.framework/AVFoundation", RTLD_LAZY);
-    dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers", RTLD_LAZY);
-
+    
     dispatch_async(dispatch_get_main_queue(), ^{
-        Class pickerCls = NSClassFromString(@"UIDocumentPickerViewController");
-        if (!pickerCls) return;
+        @try {
+            Class pickerCls = NSClassFromString(@"UIDocumentPickerViewController");
+            if (!pickerCls) return;
 
-        id picker = nil;
-        if (@available(iOS 14.0, *)) {
-            Class utCls = NSClassFromString(@"UTType");
-            id movieType = [utCls valueForKey:@"movie"];
-            picker = [[pickerCls alloc] initForOpeningContentTypes:@[movieType]];
-        } 
-        if (!picker) picker = [[pickerCls alloc] initWithDocumentTypes:@[@"public.movie"] inMode:0];
+            id picker = nil;
+            if (@available(iOS 14.0, *)) {
+                dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers", RTLD_LAZY);
+                Class utCls = NSClassFromString(@"UTType");
+                if (utCls) {
+                    id movieType = [utCls valueForKey:@"movie"];
+                    picker = [[pickerCls alloc] initForOpeningContentTypes:@[movieType]];
+                }
+            } 
+            
+            if (!picker) {
+                picker = [[pickerCls alloc] initWithDocumentTypes:@[@"public.movie"] inMode:0];
+            }
 
-        [picker setValue:self forKey:@"delegate"];
-        UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
-        while (root && root.presentedViewController) root = root.presentedViewController;
-        if (root) [root presentViewController:picker animated:YES completion:nil];
+            [picker setValue:self forKey:@"delegate"];
+            
+            // Buscar el controlador de vista superior de forma segura
+            UIWindow *keyWin = nil;
+            if (@available(iOS 13.0, *)) {
+                for (id scene in [UIApplication sharedApplication].connectedScenes) {
+                    if ([scene respondsToSelector:@selector(windows)]) {
+                        for (UIWindow *w in [scene performSelector:@selector(windows)]) {
+                            if (w.isKeyWindow) { keyWin = w; break; }
+                        }
+                    }
+                }
+            }
+            if (!keyWin) keyWin = [UIApplication sharedApplication].keyWindow;
+            
+            UIViewController *root = keyWin.rootViewController;
+            while (root.presentedViewController) root = root.presentedViewController;
+            
+            if (root) {
+                [root presentViewController:picker animated:YES completion:nil];
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"[DomiDios] Error al abrir el explorador: %@", exception);
+        }
     });
 }
 
 - (void)documentPicker:(id)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     NSURL *url = urls.firstObject;
     if (!url) return;
-    if ([url respondsToSelector:@selector(startAccessingSecurityScopedResource)]) [url performSelector:@selector(startAccessingSecurityScopedResource)];
+
+    // MUY IMPORTANTE: Iniciar acceso seguro al archivo (Evita el Crash de Sandbox)
+    BOOL canAccess = [url startAccessingSecurityScopedResource];
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *win = [UIApplication sharedApplication].keyWindow;
-        if (self.playerLayer) [(CALayer *)self.playerLayer removeFromSuperlayer];
+        @try {
+            UIWindow *win = [UIApplication sharedApplication].keyWindow;
+            
+            // Limpieza total antes de cambiar video
+            if (self.playerLayer) {
+                [(CALayer *)self.playerLayer removeFromSuperlayer];
+                if (self.player) [self.player performSelector:sel_registerName("pause")];
+                self.player = nil;
+                self.playerLayer = nil;
+                self.looper = nil;
+            }
 
-        id item = ((id (*)(id, SEL, id))objc_msgSend)(NSClassFromString(@"AVPlayerItem"), sel_registerName("playerItemWithURL:"), url);
-        self.player = ((id (*)(id, SEL, id))objc_msgSend)(NSClassFromString(@"AVQueuePlayer"), sel_registerName("queuePlayerWithItems:"), @[item]);
-        self.playerLayer = ((id (*)(id, SEL, id))objc_msgSend)(NSClassFromString(@"AVPlayerLayer"), sel_registerName("playerLayerWithPlayer:"), self.player);
+            Class playerItemCls = NSClassFromString(@"AVPlayerItem");
+            Class queuePlayerCls = NSClassFromString(@"AVQueuePlayer");
+            Class playerLayerCls = NSClassFromString(@"AVPlayerLayer");
+            Class looperCls = NSClassFromString(@"AVPlayerLooper");
 
-        [(CALayer *)self.playerLayer setFrame:win.bounds];
-        [self.playerLayer setValue:@"AVLayerVideoGravityResizeAspectFill" forKey:@"videoGravity"];
-        [(CALayer *)self.playerLayer setZPosition:-1];
+            if (!playerItemCls || !queuePlayerCls) return;
 
-        Class looperCls = NSClassFromString(@"AVPlayerLooper");
-        if (looperCls) self.looper = [[looperCls alloc] performSelector:sel_registerName("initWithPlayer:templateItem:") withObject:self.player withObject:item];
-        
-        [win.layer insertSublayer:self.playerLayer atIndex:0];
-        ((void (*)(id, SEL))objc_msgSend)(self.player, sel_registerName("play"));
+            id item = ((id (*)(id, SEL, id))objc_msgSend)(playerItemCls, sel_registerName("playerItemWithURL:"), url);
+            self.player = ((id (*)(id, SEL, id))objc_msgSend)(queuePlayerCls, sel_registerName("queuePlayerWithItems:"), @[item]);
+            self.playerLayer = ((id (*)(id, SEL, id))objc_msgSend)(playerLayerCls, sel_registerName("playerLayerWithPlayer:"), self.player);
+
+            [(CALayer *)self.playerLayer setFrame:win.bounds];
+            [self.playerLayer setValue:@"AVLayerVideoGravityResizeAspectFill" forKey:@"videoGravity"];
+            [(CALayer *)self.playerLayer setZPosition:-1];
+
+            if (looperCls) {
+                self.looper = [[looperCls alloc] performSelector:sel_registerName("initWithPlayer:templateItem:") withObject:self.player withObject:item];
+            }
+            
+            [win.layer insertSublayer:self.playerLayer atIndex:0];
+            ((void (*)(id, SEL))objc_msgSend)(self.player, sel_registerName("play"));
+            
+            // Mantener el recurso abierto mientras se reproduce
+            if (canAccess) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [url stopAccessingSecurityScopedResource];
+                });
+            }
+
+        } @catch (NSException *e) {
+             NSLog(@"[DomiDios] Error al reproducir video: %@", e);
+        }
     });
 }
 
 - (void)crearBoton:(UIWindow *)win {
     dispatch_async(dispatch_get_main_queue(), ^{
         if ([win viewWithTag:8899]) return;
+
         UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
         btn.tag = 8899;
-        btn.frame = CGRectMake(30, 200, 55, 55);
-        btn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.8];
-        btn.layer.cornerRadius = 27.5;
-        btn.layer.borderWidth = 1.5;
-        btn.layer.borderColor = [UIColor whiteColor].CGColor;
+        btn.frame = CGRectMake(30, 200, 60, 60);
+        btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
+        btn.layer.cornerRadius = 30;
+        btn.layer.borderWidth = 2;
+        btn.layer.borderColor = [UIColor cyanColor].CGColor;
         [btn setTitle:@"📁" forState:UIControlStateNormal];
         [btn addTarget:self action:@selector(abrirExplorador) forControlEvents:UIControlEventTouchUpInside];
+
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveBtn:)];
         [btn addGestureRecognizer:pan];
         [win addSubview:btn];
@@ -92,15 +151,16 @@
 }
 @end
 
-// --- INICIALIZADOR CON CONTADOR DE TIEMPO ---
+// --- INICIALIZADOR CON LICENCIA ---
 __attribute__((constructor))
 static void domidios_premium_init() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         NSDate *fechaRegistro = [prefs objectForKey:@"fecha_registro_domidios"];
-        UIWindow *window = [UIApplication sharedApplication].keyWindow;
         
+        UIWindow *window = [UIApplication sharedApplication].keyWindow;
         if (!window) return;
+        
         UIViewController *root = window.rootViewController;
         while (root && root.presentedViewController) root = root.presentedViewController;
         if (!root) return;
@@ -108,27 +168,23 @@ static void domidios_premium_init() {
         NSString *shortID = [[[[[[UIDevice currentDevice] identifierForVendor] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""] substringToIndex:5] uppercaseString];
 
         if (fechaRegistro) {
-            NSTimeInterval transcurrido = [[NSDate date] timeIntervalSinceDate:fechaRegistro];
-            NSTimeInterval duracionTotal = 30 * 86400; // 30 días
-            NSTimeInterval restante = duracionTotal - transcurrido;
+            NSTimeInterval restante = (30 * 86400) - [[NSDate date] timeIntervalSinceDate:fechaRegistro];
 
             if (restante <= 0) {
                 [prefs removeObjectForKey:@"fecha_registro_domidios"];
                 [prefs synchronize];
-                UIAlertController *exp = [UIAlertController alertControllerWithTitle:@"⚠️ EXPIRADO" message:@"Tu licencia ha vencido." preferredStyle:1];
-                [root presentViewController:exp animated:YES completion:nil];
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ exit(0); });
+                exit(0);
             } else {
-                // Cálculo de Días y Horas restantes
-                int dias = (int)(restante / 86400);
-                int horas = (int)(((long)restante % 86400) / 3600);
+                int d = (int)(restante / 86400);
+                int h = (int)(((long)restante % 86400) / 3600);
                 
                 [[FondoDomiManager shared] crearBoton:window];
                 
-                NSString *msg = [NSString stringWithFormat:@"ID: %@\n⏳ Tiempo: %d días y %d horas", shortID, dias, horas];
-                UIAlertController *status = [UIAlertController alertControllerWithTitle:@"🛡️ STATUS VIP" message:msg preferredStyle:1];
+                UIAlertController *status = [UIAlertController alertControllerWithTitle:@"🛡️ STATUS VIP" 
+                                            message:[NSString stringWithFormat:@"ID: %@\n⏳ Restante: %d d y %d h", shortID, d, h] 
+                                            preferredStyle:1];
                 [root presentViewController:status animated:YES completion:nil];
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [status dismissViewControllerAnimated:YES completion:nil]; });
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [status dismissViewControllerAnimated:YES completion:nil]; });
             }
         } else {
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🛡️ ACTIVACIÓN" message:[NSString stringWithFormat:@"ID: %@", shortID] preferredStyle:1];
@@ -139,8 +195,6 @@ static void domidios_premium_init() {
                     [prefs setObject:[NSDate date] forKey:@"fecha_registro_domidios"];
                     [prefs synchronize];
                     [[FondoDomiManager shared] crearBoton:window];
-                    // Recargar para mostrar días/horas
-                    exit(0); 
                 } else { exit(0); }
             }]];
             [root presentViewController:alert animated:YES completion:nil];
