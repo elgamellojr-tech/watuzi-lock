@@ -23,8 +23,8 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fechaActivacion) {
-            // 1. CONTADOR PERMANENTE ROJO (SUBIDO A Y: 15)
-            UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 15, window.bounds.size.width, 30)];
+            // 1. CONTADOR PERMANENTE ROJO (AJUSTADO A Y: 30)
+            UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 30, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
             timerLabel.font = [UIFont boldSystemFontOfSize:13];
