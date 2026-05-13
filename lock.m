@@ -1,12 +1,21 @@
 #import <UIKit/UIKit.h>
-#import <AVFoundation/AVFoundation.h>
-#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <objc/runtime.h>
 
-// --- MANAGER PARA EL FONDO ---
+// --- CARGA DINÁMICA DE FRAMEWORKS (Para no tocar el Makefile) ---
+__attribute__((constructor))
+static void load_frameworks() {
+    dlopen("/System/Library/Frameworks/AVFoundation.framework/AVFoundation", RTLD_LAZY);
+    dlopen("/System/Library/Frameworks/AVKit.framework/AVKit", RTLD_LAZY);
+    if (@available(iOS 14.0, *)) {
+        dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers", RTLD_LAZY);
+    }
+}
+
+// --- MANAGER DEL FONDO ---
 @interface FondoManager : NSObject <UIDocumentPickerDelegate>
-@property (nonatomic, strong) AVQueuePlayer *player;
-@property (nonatomic, strong) AVPlayerLooper *looper;
-@property (nonatomic, strong) AVPlayerLayer *playerLayer;
+@property (nonatomic, strong) id player;
+@property (nonatomic, strong) id looper;
+@property (nonatomic, strong) id playerLayer;
 + (instancetype)shared;
 - (void)crearBotonFlotante:(UIWindow *)window;
 @end
@@ -20,39 +29,53 @@
 }
 
 - (void)abrirExplorador {
-    UIDocumentPickerViewController *picker;
+    Class pickerClass = NSClassFromString(@"UIDocumentPickerViewController");
+    if (!pickerClass) return;
+
+    id picker;
     if (@available(iOS 14.0, *)) {
-        picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeMovie, UTTypeVideo, UTTypeMPEG4]];
+        // Usamos strings para evitar dependencias de UniformTypeIdentifiers en el Makefile
+        picker = [[pickerClass alloc] initForOpeningContentTypes:@[[NSClassFromString(@"UTType") valueForKey:@"movie"], [NSClassFromString(@"UTType") valueForKey:@"video"]]];
     } else {
-        picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.movie"] inMode:UIDocumentPickerModeImport];
+        picker = [[pickerClass alloc] initWithDocumentTypes:@[@"public.movie"] inMode:0];
     }
-    picker.delegate = self;
     
+    [picker setDelegate:self];
     UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
     while (rootVC.presentedViewController) rootVC = rootVC.presentedViewController;
     [rootVC presentViewController:picker animated:YES completion:nil];
 }
 
-- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+- (void)documentPicker:(id)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     NSURL *url = urls.firstObject;
     if (!url) return;
     UIWindow *win = [UIApplication sharedApplication].keyWindow;
-    if (self.playerLayer) [self.playerLayer removeFromSuperlayer];
+    
+    if (self.playerLayer) [(CALayer *)self.playerLayer removeFromSuperlayer];
 
-    AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
-    self.player = [AVQueuePlayer queuePlayerWithItems:@[item]];
-    self.playerLayer = [AVPlayerLayer playerLayerWithPlayer:self.player];
-    self.playerLayer.frame = win.bounds;
-    self.playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    self.playerLayer.zPosition = -1; // Fondo detrás de todo
+    Class itemClass = NSClassFromString(@"AVPlayerItem");
+    Class queueClass = NSClassFromString(@"AVQueuePlayer");
+    Class layerClass = NSClassFromString(@"AVPlayerLayer");
+    Class looperClass = NSClassFromString(@"AVPlayerLooper");
 
-    self.looper = [AVPlayerLooper playerLooperWithPlayer:self.player templateItem:item];
+    id item = [itemClass performSelector:@selector(playerItemWithURL:) withObject:url];
+    self.player = [queueClass performSelector:@selector(queuePlayerWithItems:) withObject:@[item]];
+    self.playerLayer = [layerClass performSelector:@selector(playerLayerWithPlayer:) withObject:self.player];
+    
+    [(CALayer *)self.playerLayer setFrame:win.bounds];
+    [(id)self.playerLayer setValue:@"AVLayerVideoGravityResizeAspectFill" forKey:@"videoGravity"];
+    [(CALayer *)self.playerLayer setZPosition:-1];
+
+    self.looper = [looperClass performSelector:@selector(playerLooperWithPlayer:templateItem:) withObject:self.player withObject:item];
     [win.layer insertSublayer:self.playerLayer atIndex:0];
-    [self.player play];
+    [self.player performSelector:@selector(play)];
 }
 
 - (void)crearBotonFlotante:(UIWindow *)window {
+    if ([window viewWithTag:9988]) return; // Evita duplicados
+    
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
+    btn.tag = 9988;
     btn.frame = CGRectMake(20, 200, 55, 55);
     btn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.7];
     btn.layer.cornerRadius = 27.5;
@@ -61,7 +84,6 @@
     [btn setTitle:@"📁" forState:UIControlStateNormal];
     [btn addTarget:self action:@selector(abrirExplorador) forControlEvents:UIControlEventTouchUpInside];
     
-    // Hacerlo arrastrable
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [btn addGestureRecognizer:pan];
     [window addSubview:btn];
@@ -74,11 +96,11 @@
 }
 @end
 
-// --- INICIO DEL TWEAK (TU CÓDIGO ORIGINAL MODIFICADO) ---
+// --- INICIO DE LA LÓGICA PRINCIPAL ---
 __attribute__((visibility("default")))
 __attribute__((constructor))
 static void domidios_premium_init() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         NSDate *fechaActivacion = [prefs objectForKey:@"fecha_registro_domidios"];
@@ -95,36 +117,42 @@ static void domidios_premium_init() {
                 }
             }
         }
+        
         UIViewController *rootVC = window.rootViewController;
         while (rootVC.presentedViewController) rootVC = rootVC.presentedViewController;
         if (!rootVC) return;
 
+        // CASO 1: YA ESTÁ ACTIVADO
         if (fechaActivacion) {
-            NSTimeInterval segundosTranscurridos = [[NSDate date] timeIntervalSinceDate:fechaActivacion];
-            NSTimeInterval tiempoRestante = (30 * 86400) - segundosTranscurridos;
-
-            if (tiempoRestante <= 0) {
+            NSTimeInterval segundos = [[NSDate date] timeIntervalSinceDate:fechaActivacion];
+            if (segundos >= (30 * 86400)) {
                 [prefs removeObjectForKey:@"fecha_registro_domidios"];
                 [prefs synchronize];
                 exit(0);
             } else {
-                // SI ESTÁ ACTIVADO: Creamos el botón de fondo
                 [[FondoManager shared] crearBotonFlotante:window];
-                
-                int dias = (int)(tiempoRestante / 86400);
-                NSString *statusMsg = [NSString stringWithFormat:@"ID: %@\n⏳ Vence en: %d días", deviceShortID, dias];
-                UIAlertController *status = [UIAlertController alertControllerWithTitle:@"🛡️ STATUS VIP" message:statusMsg preferredStyle:UIAlertControllerStyleAlert];
+                int dias = (int)((30 * 86400 - segundos) / 86400);
+                UIAlertController *status = [UIAlertController alertControllerWithTitle:@"🛡️ STATUS VIP" message:[NSString stringWithFormat:@"ID: %@\n⏳ Vence en: %d días", deviceShortID, dias] preferredStyle:1];
                 [rootVC presentViewController:status animated:YES completion:nil];
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [status dismissViewControllerAnimated:YES completion:nil]; });
             }
-        }
+        } 
+        // CASO 2: NO ACTIVADO (PRIMERA VEZ)
+        else {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🛡️ ACTIVACIÓN" message:[NSString stringWithFormat:@"Tu ID: %@\nIntroduce tu llave VIP.", deviceShortID] preferredStyle:1];
+            [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) { tf.placeholder = @"Key..."; tf.secureTextEntry = YES; }];
 
-        if (![prefs objectForKey:@"fecha_registro_domidios"]) {
-            // (Código de activación omitido por brevedad, es el mismo que ya tienes)
-            // Solo asegúrate de llamar a [[FondoManager shared] crearBotonFlotante:window]; 
-            // dentro del bloque de éxito del inputKey.
-            
-            // ... [Aquí va tu UIAlertController de activación] ...
+            [alert addAction:[UIAlertAction actionWithTitle:@"ACTIVAR" style:0 handler:^(UIAlertAction *action) {
+                NSString *key = alert.textFields.firstObject.text;
+                if ([key hasPrefix:@"VIP"] && [key hasSuffix:@"7"] && [key containsString:deviceShortID]) {
+                    [prefs setObject:[NSDate date] forKey:@"fecha_registro_domidios"];
+                    [prefs synchronize];
+                    [[FondoManager shared] crearBotonFlotante:window];
+                } else {
+                    exit(0);
+                }
+            }]];
+            [rootVC presentViewController:alert animated:YES completion:nil];
         }
     });
 }
