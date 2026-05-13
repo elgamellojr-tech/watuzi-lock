@@ -1,5 +1,4 @@
 #import <UIKit/UIKit.h>
-#import <QuartzCore/QuartzCore.h>
 
 // --- CONFIGURACIÓN ---
 #define PREF_KEY @"fecha_registro_domidios"
@@ -13,6 +12,7 @@ static void domidios_premium_init() {
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         NSDate *fechaActivacion = [prefs objectForKey:PREF_KEY];
         
+        // ID para la activación
         NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
         NSString *shortID = [[deviceID substringToIndex:5] uppercaseString];
         
@@ -27,31 +27,38 @@ static void domidios_premium_init() {
         if (!window) window = [UIApplication sharedApplication].keyWindow;
         if (!window) return;
 
-        // --- LÓGICA DE CONTADOR SI ESTÁ ACTIVADO ---
+        // --- LÓGICA DE CONTADOR PERMANENTE ---
         if (fechaActivacion) {
             NSTimeInterval transcurrido = [[NSDate date] timeIntervalSinceDate:fechaActivacion];
             NSTimeInterval restante = (DURACION_DIAS * 86400) - transcurrido;
 
             if (restante <= 0) {
-                exit(0); // O mostrar alerta de expirado
+                exit(0); 
             } else {
-                // CREAR BANNER DEL CONTADOR
-                UIView *counterView = [[UIView alloc] initWithFrame:CGRectMake((window.bounds.size.width-250)/2, 50, 250, 40)];
-                counterView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.8];
-                counterView.layer.cornerRadius = 12;
-                counterView.layer.borderWidth = 1.0;
-                counterView.layer.borderColor = [UIColor systemYellowColor].CGColor;
+                // CONTENEDOR TRANSPARENTE
+                // Lo situamos en la parte superior (ajusta el 'y' si choca con el notch)
+                UIView *counterContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
+                counterContainer.backgroundColor = [UIColor clearColor]; // Fondo transparente
+                counterContainer.userInteractionEnabled = NO; // Para que no bloquee toques en la app
                 
-                UILabel *timerLabel = [[UILabel alloc] initWithFrame:counterView.bounds];
-                timerLabel.textColor = [UIColor whiteColor];
-                timerLabel.font = [UIFont fontWithName:@"Courier-Bold" size:13];
+                UILabel *timerLabel = [[UILabel alloc] initWithFrame:counterContainer.bounds];
+                timerLabel.textColor = [UIColor redColor]; // Números en rojo
+                timerLabel.font = [UIFont fontWithName:@"Courier-Bold" size:14];
                 timerLabel.textAlignment = NSTextAlignmentCenter;
-                [counterView addSubview:timerLabel];
-                [window addSubview:counterView];
+                
+                // Sombra para que se lea bien en cualquier fondo
+                timerLabel.layer.shadowColor = [UIColor blackColor].CGColor;
+                timerLabel.layer.shadowOffset = CGSizeMake(1.0, 1.0);
+                timerLabel.layer.shadowOpacity = 1.0;
+                timerLabel.layer.shadowRadius = 1.0;
 
-                // Función para actualizar el tiempo cada segundo
+                [counterContainer addSubview:timerLabel];
+                [window addSubview:counterContainer];
+
+                // Timer que actualiza cada segundo y NO se detiene
                 [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
                     NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
+                    
                     if (r <= 0) { exit(0); }
                     
                     int d = (int)(r / 86400);
@@ -59,34 +66,33 @@ static void domidios_premium_init() {
                     int m = (int)((NSInteger)r % 3600) / 60;
                     int s = (int)((NSInteger)r % 60);
                     
-                    timerLabel.text = [NSString stringWithFormat:@"⏳ %02dD %02dH %02dM %02dS", d, h, m, s];
+                    timerLabel.text = [NSString stringWithFormat:@"VIP: %02dD %02dH %02dM %02dS", d, h, m, s];
+                    
+                    // Asegurar que el contador siempre esté al frente si la app cambia de vista
+                    [window bringSubviewToFront:counterContainer];
                 }];
-
-                // Animación para que el contador desaparezca después de 10 segundos (opcional)
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    [UIView animateWithDuration:1.0 animations:^{ counterView.alpha = 0; } completion:^(BOOL f){ [counterView removeFromSuperview]; }];
-                });
                 return;
             }
         }
 
-        // --- MENÚ DE ACTIVACIÓN (Si no hay fecha) ---
+        // --- MENÚ DE ACTIVACIÓN (SOLO SI NO ESTÁ ACTIVADO) ---
         if (!fechaActivacion) {
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🛡️ ACTIVACIÓN"
-                                        message:[NSString stringWithFormat:@"ID: %@\nEnvíalo a @iOS_DOMIDIOS", shortID]
+                                        message:[NSString stringWithFormat:@"ID: %@\nEnvíalo para tu llave.", shortID]
                                         preferredStyle:UIAlertControllerStyleAlert];
 
             [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
                 tf.placeholder = @"VIP-XXXXX-7";
                 tf.textAlignment = NSTextAlignmentCenter;
+                tf.keyboardAppearance = UIKeyboardAppearanceDark;
             }];
 
-            [alert addAction:[UIAlertAction actionWithTitle:@"VERIFICAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            [alert addAction:[UIAlertAction actionWithTitle:@"ACTIVAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
                 NSString *keyMaestra = [NSString stringWithFormat:@"VIP-%@-7", shortID];
                 if ([alert.textFields.firstObject.text isEqualToString:keyMaestra]) {
                     [prefs setObject:[NSDate date] forKey:PREF_KEY];
                     [prefs synchronize];
-                    exit(0); // Reiniciar para activar contador
+                    exit(0);
                 } else {
                     exit(0);
                 }
