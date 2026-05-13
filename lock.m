@@ -33,13 +33,17 @@
                 dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers", RTLD_LAZY);
                 Class utCls = NSClassFromString(@"UTType");
                 if (utCls) {
-                    id movieType = [utCls valueForKey:@"movie"];
-                    picker = [[pickerCls alloc] initForOpeningContentTypes:@[movieType]];
+                    // FIX APLICADO: Usar typeWithIdentifier en lugar de valueForKey para evitar el crash
+                    id movieType = [utCls performSelector:sel_registerName("typeWithIdentifier:") withObject:@"public.movie"];
+                    if (movieType) {
+                        picker = [[pickerCls alloc] initForOpeningContentTypes:@[movieType]];
+                    }
                 }
             } 
             
+            // FALLBACK: Respaldo por si falla el bloque anterior
             if (!picker) {
-                picker = [[pickerCls alloc] initWithDocumentTypes:@[@"public.movie"] inMode:0];
+                picker = [[pickerCls alloc] initWithDocumentTypes:@[@"public.movie", @"public.video"] inMode:0];
             }
 
             [picker setValue:self forKey:@"delegate"];
@@ -58,10 +62,14 @@
             if (!keyWin) keyWin = [UIApplication sharedApplication].keyWindow;
             
             UIViewController *root = keyWin.rootViewController;
-            while (root.presentedViewController) root = root.presentedViewController;
+            while (root.presentedViewController) {
+                root = root.presentedViewController;
+            }
             
             if (root) {
                 [root presentViewController:picker animated:YES completion:nil];
+            } else {
+                NSLog(@"[DomiDios] Error: No se encontró RootViewController");
             }
         } @catch (NSException *exception) {
             NSLog(@"[DomiDios] Error al abrir el explorador: %@", exception);
