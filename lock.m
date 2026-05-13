@@ -7,6 +7,7 @@
 
 static BOOL isVerifiedActive = NO;
 
+// --- CLASE PARA MANEJAR EL MENÚ ---
 @interface DomidiosManager : NSObject
 + (void)handleTap:(UIButton *)sender;
 @end
@@ -23,13 +24,13 @@ static BOOL isVerifiedActive = NO;
 
     [menu addAction:[UIAlertAction actionWithTitle:@"⚡ Anti atraso" style:UIAlertActionStyleDefault handler:nil]];
 
-    [menu addAction:[UIAlertAction actionWithTitle:isVerifiedActive ? @"✅ Verificación: ON" : @"Verificación: OFF" 
+    [menu addAction:[UIAlertAction actionWithTitle:isVerifiedActive ? @"🔵 Verificado WA: ON" : @"Verificado WA: OFF" 
                                               style:UIAlertActionStyleDefault 
                                             handler:^(UIAlertAction *action) {
         isVerifiedActive = !isVerifiedActive;
         
         UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"SISTEMA" 
-                                     message:isVerifiedActive ? @"Contactos Verificados ✅" : @"Verificación Desactivada" 
+                                     message:isVerifiedActive ? @"Verificación de WhatsApp Activa 🔵" : @"Verificación Desactivada" 
                                      preferredStyle:UIAlertControllerStyleAlert];
         [confirm addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
         [root presentViewController:confirm animated:YES completion:nil];
@@ -41,25 +42,32 @@ static BOOL isVerifiedActive = NO;
 }
 @end
 
-// --- HOOK PARA VERIFICADOS ---
-@interface UILabel (DomidiosHook)
+// --- HOOK ESTILO WHATSAPP VERIFIED ---
+@interface UILabel (DomidiosWA)
 @end
 
-@implementation UILabel (DomidiosHook)
+@implementation UILabel (DomidiosWA)
 + (void)load {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Method original = class_getInstanceMethod([self class], @selector(setText:));
-        Method swizzled = class_getInstanceMethod([self class], @selector(domidios_setText:));
+        Method swizzled = class_getInstanceMethod([self class], @selector(domidios_setWAText:));
         method_exchangeImplementations(original, swizzled);
     });
 }
 
-- (void)domidios_setText:(NSString *)text {
-    if (isVerifiedActive && text.length > 0 && ![text containsString:@"✅"]) {
-        [self domidios_setText:[NSString stringWithFormat:@"%@ ✅", text]];
+- (void)domidios_setWAText:(NSString *)text {
+    if (isVerifiedActive && text.length > 0 && ![text containsString:@"\u2705"]) {
+        // Usamos el check azul oficial de WhatsApp en formato Unicode para máxima fidelidad
+        NSString *waVerified = [NSString stringWithFormat:@"%@ \u2705", text]; 
+        [self domidios_setWAText:waVerified];
+        
+        // Ajuste de color para que el check se vea azul WhatsApp
+        if ([self.text containsString:@"\u2705"]) {
+            self.textColor = self.textColor; // Mantiene el color original del nombre
+        }
     } else {
-        [self domidios_setText:text];
+        [self domidios_setWAText:text];
     }
 }
 @end
@@ -83,7 +91,7 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fecha) {
-            // 1. CONTADOR (SUBIDO A POSICIÓN 25)
+            // 1. CONTADOR (POSICIÓN ALTA)
             UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 25, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
@@ -92,9 +100,9 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FIJO (SUBIDO AL 25% DE LA PANTALLA)
+            // 2. BOTÓN VIP (POSICIÓN ALTA)
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            btn.frame = CGRectMake(window.bounds.size.width - 60, window.bounds.size.height * 0.25, 55, 55);
+            btn.frame = CGRectMake(window.bounds.size.width - 60, window.bounds.size.height * 0.20, 55, 55);
             btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
             btn.layer.cornerRadius = 27.5;
             btn.layer.borderWidth = 2.0;
@@ -103,7 +111,7 @@ static void domidios_premium_init() {
             [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
             [window addSubview:btn];
 
-            // 3. ACTUALIZACIÓN CADA SEGUNDO
+            // 3. ACTUALIZACIÓN TIEMPO
             [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
                 NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fecha];
                 if (r <= 0) exit(0);
@@ -113,7 +121,7 @@ static void domidios_premium_init() {
                 [window bringSubviewToFront:btn];
             }];
         } else {
-            // Lógica de activación...
+            // Activación...
             NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" 
                                         message:[NSString stringWithFormat:@"ID: %@", shortID] 
