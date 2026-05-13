@@ -4,14 +4,12 @@
 #define PREF_KEY @"fecha_registro_domidios"
 #define DURACION_DIAS 30
 
-// --- CLASE PARA MANEJAR EL MENÚ ---
 @interface DomidiosManager : NSObject
 + (void)handleTap:(UIButton *)sender;
 @end
 
 @implementation DomidiosManager
 
-// Acción al tocar el botón
 + (void)handleTap:(UIButton *)sender {
     UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
     while(root.presentedViewController) root = root.presentedViewController;
@@ -21,22 +19,24 @@
                                 preferredStyle:UIAlertControllerStyleActionSheet];
 
     // Opción 1: Anti atraso
-    [menu addAction:[UIAlertAction actionWithTitle:@"⚡ Anti atraso" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        // Espacio para lógica futura
-    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"⚡ Anti atraso" style:UIAlertActionStyleDefault handler:nil]];
 
-    // Opción 2: Verificación (Visual)
+    // Opción 2: Verificación (Visual al lado del ID)
     [menu addAction:[UIAlertAction actionWithTitle:@"✅ Verificación" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        UIAlertController *vAlert = [UIAlertController alertControllerWithTitle:@"VERIFICACIÓN DE CONTACTOS" 
-                                     message:@"\n● Estado: Protegido\n● Base de datos: Sincronizada\n● Contactos VIP: Verificados" 
+        NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
+        
+        // Simulación visual: Muestra el ID con el check de verificado al lado
+        NSString *msg = [NSString stringWithFormat:@"\nUsuario: %@ ✅\nEstado: Verificado con éxito\nSincronización: Activa", shortID];
+        
+        UIAlertController *vAlert = [UIAlertController alertControllerWithTitle:@"SISTEMA DE VERIFICACIÓN" 
+                                     message:msg 
                                      preferredStyle:UIAlertControllerStyleAlert];
-        [vAlert addAction:[UIAlertAction actionWithTitle:@"Cerrar" style:UIAlertActionStyleCancel handler:nil]];
+        [vAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
         [root presentViewController:vAlert animated:YES completion:nil];
     }]];
 
-    [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar Menú" style:UIAlertActionStyleCancel handler:nil]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar" style:UIAlertActionStyleCancel handler:nil]];
     
-    // Soporte para iPad
     menu.popoverPresentationController.sourceView = sender;
     [root presentViewController:menu animated:YES completion:nil];
 }
@@ -49,8 +49,8 @@ static void domidios_premium_init() {
         
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         NSDate *fechaActivacion = [prefs objectForKey:PREF_KEY];
-        
         UIWindow *window = [UIApplication sharedApplication].keyWindow;
+        
         if (!window && @available(iOS 13.0, *)) {
             for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
                 if (scene.activationState == UISceneActivationStateForegroundActive) {
@@ -61,7 +61,7 @@ static void domidios_premium_init() {
         if (!window) return;
 
         if (fechaActivacion) {
-            // 1. CONTADOR SUPERIOR FIJO
+            // 1. TIMER SUPERIOR
             UIView *cView = [[UIView alloc] initWithFrame:CGRectMake(0, 45, window.bounds.size.width, 30)];
             UILabel *timerLabel = [[UILabel alloc] initWithFrame:cView.bounds];
             timerLabel.textColor = [UIColor redColor];
@@ -70,25 +70,19 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FIJO (NO FLOTANTE/NO MOVIBLE)
+            // 2. BOTÓN FIJO (ESTÁTICO)
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            // Posición fija a la derecha
             btn.frame = CGRectMake(window.bounds.size.width - 60, window.bounds.size.height / 2, 55, 55);
             btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
             btn.layer.cornerRadius = 27.5;
             btn.layer.borderWidth = 2.0;
             btn.layer.borderColor = [UIColor redColor].CGColor;
-            
             [btn setTitle:@"VIP" forState:UIControlStateNormal];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-
-            // Solo acción de toque, sin gestos de movimiento
-            [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
             
+            [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
             [window addSubview:btn];
 
-            // 3. TIMER DE ACTUALIZACIÓN
+            // 3. BUCLE DE TIEMPO
             [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
                 NSTimeInterval r = (DURACION_DIAS * 86400) - [[NSDate date] timeIntervalSinceDate:fechaActivacion];
                 if (r <= 0) exit(0);
@@ -100,7 +94,7 @@ static void domidios_premium_init() {
                 [window bringSubviewToFront:btn];
             }];
         } else {
-            // Panel de activación
+            // LÓGICA DE ACTIVACIÓN
             NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" 
                                         message:[NSString stringWithFormat:@"ID: %@", shortID] 
