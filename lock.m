@@ -21,7 +21,6 @@
 }
 
 - (void)abrirExplorador {
-    // Cargamos frameworks manualmente en tiempo de ejecución
     dlopen("/System/Library/Frameworks/AVFoundation.framework/AVFoundation", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/AVKit.framework/AVKit", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers", RTLD_LAZY);
@@ -45,8 +44,8 @@
     [picker setValue:self forKey:@"delegate"];
     
     UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
-    while (root.presentedViewController) root = root.presentedViewController;
-    [root presentViewController:picker animated:YES completion:nil];
+    while (root && root.presentedViewController) root = root.presentedViewController;
+    if (root) [root presentViewController:picker animated:YES completion:nil];
 }
 
 - (void)documentPicker:(id)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
@@ -56,7 +55,6 @@
     UIWindow *win = [UIApplication sharedApplication].keyWindow;
     if (self.playerLayer) [(CALayer *)self.playerLayer removeFromSuperlayer];
 
-    // Invocación dinámica de AVFoundation para evitar errores de Linker
     Class playerItemCls = NSClassFromString(@"AVPlayerItem");
     Class queuePlayerCls = NSClassFromString(@"AVQueuePlayer");
     Class playerLayerCls = NSClassFromString(@"AVPlayerLayer");
@@ -70,7 +68,9 @@
     [self.playerLayer setValue:@"AVLayerVideoGravityResizeAspectFill" forKey:@"videoGravity"];
     [(CALayer *)self.playerLayer setZPosition:-1];
 
-    self.looper = [[looperCls alloc] performSelector:sel_registerName("initWithPlayer:templateItem:") withObject:self.player withObject:item];
+    if (looperCls) {
+        self.looper = [[looperCls alloc] performSelector:sel_registerName("initWithPlayer:templateItem:") withObject:self.player withObject:item];
+    }
     
     [win.layer insertSublayer:self.playerLayer atIndex:0];
     ((void (*)(id, SEL))objc_msgSend)(self.player, sel_registerName("play"));
@@ -84,6 +84,8 @@
     btn.frame = CGRectMake(30, 200, 55, 55);
     btn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.7];
     btn.layer.cornerRadius = 27.5;
+    btn.layer.borderWidth = 1;
+    btn.layer.borderColor = [UIColor whiteColor].CGColor;
     [btn setTitle:@"📁" forState:UIControlStateNormal];
     [btn addTarget:self action:@selector(abrirExplorador) forControlEvents:UIControlEventTouchUpInside];
 
@@ -95,7 +97,8 @@
 - (void)moveBtn:(UIPanGestureRecognizer *)p {
     CGPoint t = [p translationInView:p.view.superview];
     p.view.center = CGPointMake(p.view.center.x + t.x, p.view.center.y + t.y);
-    [p setTranslation:CGPointZero inView:p.view.superview];
+    // SOLUCIÓN AL ERROR: Usamos CGPointMake en lugar de CGPointZero
+    [p setTranslation:CGPointMake(0, 0) inView:p.view.superview];
 }
 @end
 
@@ -105,20 +108,24 @@ static void domidios_premium_init() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
-        NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
+        NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
+        NSString *shortID = [[deviceID substringToIndex:5] uppercaseString];
         
-        UIWindow *window = [UIApplication sharedApplication].keyWindow;
-        if (!window && @available(iOS 13.0, *)) {
+        UIWindow *window = nil;
+        if (@available(iOS 13.0, *)) {
             for (id scene in [UIApplication sharedApplication].connectedScenes) {
-                if ([scene activationState] == 0) {
-                    window = [[scene windows] firstObject];
+                if ([scene respondsToSelector:sel_registerName("activationState")] && 
+                    (NSInteger)[scene performSelector:sel_registerName("activationState")] == 0) {
+                    window = [[scene performSelector:sel_registerName("windows")] firstObject];
                     break;
                 }
             }
         }
+        if (!window) window = [UIApplication sharedApplication].keyWindow;
+        if (!window) return;
         
         UIViewController *root = window.rootViewController;
-        while (root.presentedViewController) root = root.presentedViewController;
+        while (root && root.presentedViewController) root = root.presentedViewController;
         if (!root) return;
 
         if ([prefs objectForKey:@"fecha_registro_domidios"]) {
