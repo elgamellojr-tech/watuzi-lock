@@ -1,4 +1,19 @@
-#import <UIKit/UIKit.h>
+#import @interface WAMessage : NSObject
+- (void)setRevoked:(BOOL)arg1;
+@end
+
+@interface WAChatSessionViewController : UIViewController
+- (void)sendReadReceipt;
+- (void)sendTypingStatus;
+@end
+
+@interface WAStatusMessageManager : NSObject
+- (void)sendReadReceiptForMessage:(id)arg1;
+@end
+
+@interface WAStaticConstants : NSObject
++ (double)maximumStatusVideoDuration;
+@end <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
 // --- FUNCIÓN PARA EL GHOST MODE Y ANTI-REVOKE (Sin necesidad de Headers) ---
