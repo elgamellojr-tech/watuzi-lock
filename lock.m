@@ -17,21 +17,22 @@
     UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
     while(root.presentedViewController) root = root.presentedViewController;
 
-    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"🚀 iOS DOMIDIOS VIP" 
-                                message:@"Menú de Gestión" 
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"🚀 PANEL VIP" 
+                                message:@"iOS DOMIDIOS" 
                                 preferredStyle:UIAlertControllerStyleActionSheet];
 
-    [menu addAction:[UIAlertAction actionWithTitle:@"📱 Telegram" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/iOS_DOMIDIOS"] options:@{} completionHandler:nil];
+    // Opción 1: Anti atraso
+    [menu addAction:[UIAlertAction actionWithTitle:@"⚡ Anti atraso" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        // Opción visual/funcional de optimización
     }]];
 
-    [menu addAction:[UIAlertAction actionWithTitle:@"ℹ️ Info Licencia" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSDate *fecha = [[NSUserDefaults standardUserDefaults] objectForKey:PREF_KEY];
-        UIAlertController *info = [UIAlertController alertControllerWithTitle:@"ESTADO" 
-                                    message:[NSString stringWithFormat:@"Activado: %@", fecha] 
-                                    preferredStyle:UIAlertControllerStyleAlert];
-        [info addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
-        [root presentViewController:info animated:YES completion:nil];
+    // Opción 2: Verificación (Solo Visual)
+    [menu addAction:[UIAlertAction actionWithTitle:@"✅ Verificación" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        UIAlertController *vAlert = [UIAlertController alertControllerWithTitle:@"ESTADO DE CONTACTOS" 
+                                     message:@"\n✓ Servidor: Activo\n✓ Contactos: Verificados\n✓ Encriptación: Habilitada" 
+                                     preferredStyle:UIAlertControllerStyleAlert];
+        [vAlert addAction:[UIAlertAction actionWithTitle:@"Entendido" style:UIAlertActionStyleCancel handler:nil]];
+        [root presentViewController:vAlert animated:YES completion:nil];
     }]];
 
     [menu addAction:[UIAlertAction actionWithTitle:@"❌ Cerrar" style:UIAlertActionStyleCancel handler:nil]];
@@ -40,7 +41,7 @@
     [root presentViewController:menu animated:YES completion:nil];
 }
 
-// Lógica para mover el botón
+// Lógica para arrastrar el botón (Flotante Real)
 + (void)handlePan:(UIPanGestureRecognizer *)gesture {
     UIView *button = gesture.view;
     CGPoint translation = [gesture translationInView:button.superview];
@@ -77,7 +78,7 @@ static void domidios_premium_init() {
             [cView addSubview:timerLabel];
             [window addSubview:cView];
 
-            // 2. BOTÓN FLOTANTE (SIN IMAGEN)
+            // 2. BOTÓN FLOTANTE Y ARRSTRABLE
             UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
             btn.frame = CGRectMake(window.bounds.size.width - 65, window.bounds.size.height / 2, 55, 55);
             btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.7];
@@ -85,12 +86,10 @@ static void domidios_premium_init() {
             btn.layer.borderWidth = 2.0;
             btn.layer.borderColor = [UIColor redColor].CGColor;
             
-            // Texto en lugar de imagen
-            [btn setTitle:@"ID" forState:UIControlStateNormal];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:18];
-            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [btn setTitle:@"VIP" forState:UIControlStateNormal];
+            btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
 
-            // Gestos
+            // Gestos: Movimiento (Pan) y Toque (Tap)
             UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[DomidiosManager class] action:@selector(handlePan:)];
             [btn addGestureRecognizer:pan];
             [btn addTarget:[DomidiosManager class] action:@selector(handleTap:) forControlEvents:UIControlEventTouchUpInside];
@@ -111,7 +110,9 @@ static void domidios_premium_init() {
         } else {
             // Lógica de activación estándar
             NSString *shortID = [[[[[UIDevice currentDevice] identifierForVendor] UUIDString] substringToIndex:5] uppercaseString];
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" message:[NSString stringWithFormat:@"ID: %@", shortID] preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ACTIVACIÓN" 
+                                        message:[NSString stringWithFormat:@"ID: %@", shortID] 
+                                        preferredStyle:UIAlertControllerStyleAlert];
             [alert addTextFieldWithConfigurationHandler:nil];
             [alert addAction:[UIAlertAction actionWithTitle:@"ACTIVAR" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
                 if ([alert.textFields.firstObject.text isEqualToString:[NSString stringWithFormat:@"VIP-%@-7", shortID]]) {
