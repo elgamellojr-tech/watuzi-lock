@@ -60,7 +60,7 @@ static void domidios_premium_init() {
                                         preferredStyle:UIAlertControllerStyleAlert];
 
             [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-                tf.placeholder = @"VIP-XXXXX-7";
+                tf.placeholder = @"ingresa tu key aqui";
                 tf.secureTextEntry = YES;
                 tf.keyboardAppearance = UIKeyboardAppearanceDark;
                 tf.textAlignment = NSTextAlignmentCenter;
