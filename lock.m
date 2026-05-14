@@ -12,6 +12,10 @@ BOOL hook_WatusiPurchasedStatus(id self, SEL _cmd) {
     return YES; // Fuerza el estado de cuenta comprada
 }
 
+BOOL hook_WatusiShouldNotShowAds(id self, SEL _cmd) {
+    return NO; // Fuerza a que "shouldShowAds" devuelva siempre Falso
+}
+
 // ============================================================================
 // COMPORTAMIENTO DE CELDAS DE ANUNCIOS (FORZAR ALTURA CERO)
 // ============================================================================
@@ -39,7 +43,7 @@ __attribute__((constructor)) static void initAntiAdsWatusi() {
         // Hooks para forzar el estado Premium/Sin Anuncios
         class_replaceMethod(watusiManager, NSSelectorFromString(@"isPurchased"), (IMP)hook_WatusiPurchasedStatus, "B@:");
         class_replaceMethod(watusiManager, NSSelectorFromString(@"adsRemoved"), (IMP)hook_WatusiNoAds, "B@:");
-        class_replaceMethod(watusiManager, NSSelectorFromString(@"shouldShowAds"), (IMP)char_replaceMethod -> BOOL { return NO; }, "B@:");
+        class_replaceMethod(watusiManager, NSSelectorFromString(@"shouldShowAds"), (IMP)hook_WatusiShouldNotShowAds, "B@:");
     }
     
     // 2. Bloqueo de Controladores de Anuncios Comunes (AdMob / Custom Banners)
