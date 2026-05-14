@@ -1,5 +1,4 @@
 #import <UIKit/UIKit.h>
-#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 
 // --- Instancia global del botón flotante ---
@@ -14,16 +13,17 @@ static UIButton *floatingMenuButton = nil;
 
 // Variables persistentes para el cambio visual en caliente
 @property (nonatomic, strong) NSString *currentVisualName;
-@property (nonatomic, strong) UIImage *currentVisualAvatar;
+@property (nonatomic, strong) UIColor *currentVisualAvatarColor;
 @end
 
 @implementation DOMIDIOSProfileViewController
 
 - (void)viewDidLoad {
-    [super __view_did_load_custom__]; // Evitamos conflictos usando llamadas limpias
+    [super viewDidLoad];
     
     // Inicializar valores por defecto si están vacíos
     if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
+    if (!self.currentVisualAvatarColor) self.currentVisualAvatarColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
     
     self.title = @"DOMIDIOS MENU";
     self.view.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0];
@@ -46,11 +46,6 @@ static UIButton *floatingMenuButton = nil;
     [self.view addSubview:self.tableView];
     
     [self setupHeaderView];
-}
-
-// Método puente seguro para evitar warnings del ciclo de vida de UIViewController
-- (void)__view_did_load_custom__ {
-    // Espacio reservado para inicializaciones del sistema
 }
 
 - (void)dismissMenu {
@@ -77,12 +72,7 @@ static UIButton *floatingMenuButton = nil;
     self.avatarImageView.layer.borderWidth = 3.0;
     self.avatarImageView.layer.borderColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0].CGColor;
     self.avatarImageView.clipsToBounds = YES;
-    
-    if (self.currentVisualAvatar) {
-        self.avatarImageView.image = self.currentVisualAvatar;
-    } else {
-        self.avatarImageView.backgroundColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
-    }
+    self.avatarImageView.backgroundColor = self.currentVisualAvatarColor;
     [headerContainer addSubview:self.avatarImageView];
     
     self.onlineStatusDot = [[UIView alloc] initWithFrame:CGRectMake(82, 162, 14, 14)];
@@ -148,7 +138,6 @@ static UIButton *floatingMenuButton = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.imageView.image = nil;
     
-    // SECCIÓN 0: OPCIONES VISUALES
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
             cell.textLabel.text = @"PROFILE NAME";
@@ -159,14 +148,13 @@ static UIButton *floatingMenuButton = nil;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"PROFILE PICTURE";
-            cell.detailTextLabel.text = @"Tap to Change Avatar Blend (Visual)";
+            cell.detailTextLabel.text = @"Tap to Change Avatar Color (Visual)";
             if (@available(iOS 13.0, *)) {
                 cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
             }
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
     }
-    // SECCIÓN 1: LICENCIA
     else if (indexPath.section == 1) {
         if (indexPath.row == 0) {
             cell.textLabel.text = @"UDID";
@@ -202,7 +190,6 @@ static UIButton *floatingMenuButton = nil;
             cell.accessoryView = statusBadge;
         }
     } 
-    // SECCIONES FINALES
     else if (indexPath.section == 2) {
         cell.textLabel.text = @"Theme Settings";
         cell.detailTextLabel.text = @"Colors, icons, layout";
@@ -250,25 +237,19 @@ static UIButton *floatingMenuButton = nil;
         [self presentViewController:alert animated:YES completion:nil];
     }
     else if (indexPath.section == 0 && indexPath.row == 1) {
-        static int avatarIndex = 0;
-        avatarIndex++;
+        static int colorIndex = 0;
+        colorIndex++;
         
-        CGRect rect = CGRectMake(0, 0, 100, 100);
-        UIGraphicsBeginImageContext(rect.size);
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        
-        if (avatarIndex % 2 == 0) {
-            CGContextSetFillColorWithColor(context, [UIColor systemRedColor].CGColor);
-        } else {
-            CGContextSetFillColorWithColor(context, [UIColor systemPurpleColor].CGColor);
+        // Alternar colores puros de UIKit directamente para no requerir CoreGraphics en Clang
+        UIColor *newColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
+        if (colorIndex % 3 == 1) {
+            newColor = [UIColor systemRedColor];
+        } else if (colorIndex % 3 == 2) {
+            newColor = [UIColor systemPurpleColor];
         }
         
-        CGContextFillRect(context, rect);
-        UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-        
-        self.currentVisualAvatar = newImage;
-        self.avatarImageView.image = newImage;
+        self.currentVisualAvatarColor = newColor;
+        self.avatarImageView.backgroundColor = newColor;
         [self.tableView reloadData];
     }
 }
@@ -287,7 +268,8 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
     
     if ([sender state] == UIGestureRecognizerStateChanged) {
         piece.center = CGPointMake(piece.center.x + translation.x, piece.center.y + translation.y);
-        [sender setTranslation:CGPointZero inView:piece.superview];
+        // Reseteo nativo manual equivalente a CGPointZero sin usar la macro del linker
+        [sender setTranslation:CGPointTranslate(CGPointZero, 0, 0) inView:piece.superview];
     }
 }
 
