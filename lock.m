@@ -2,7 +2,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 
-// --- VISTA DINÁMICA ---
+// --- VISTA DEL FONDO ANIMADO ---
 @interface DynamicBackgroundView : UIView
 @end
 
@@ -12,76 +12,71 @@
     self = [super initWithFrame:frame];
     if (self) {
         self.userInteractionEnabled = NO;
-        self.tag = 888;
+        self.tag = 888; // Identificador para no duplicar la vista
+        self.backgroundColor = [UIColor clearColor];
         [self startInfiniteAnimation];
         
+        // REINICIO AUTOMÁTICO: Si sales y entras a la app, esto reactiva el movimiento
         [[NSNotificationCenter defaultCenter] addObserver:self 
                                                  selector:@selector(startInfiniteAnimation) 
-                                                     name:UIApplicationWillEnterForegroundNotification 
+                                                     name:UIApplicationDidBecomeActiveNotification 
                                                    object:nil];
     }
     return self;
 }
 
 - (void)startInfiniteAnimation {
+    // Limpiamos animaciones viejas para que no se congele
     [self.layer removeAllAnimations];
 
+    // Animación de opacidad persistente (puedes cambiar 'opacity' por 'backgroundColor' si prefieres)
     CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"opacity"];
     animation.fromValue = @(1.0);
-    animation.toValue = @(0.4);
-    animation.duration = 2.0; 
+    animation.toValue = @(0.5);
+    animation.duration = 2.5; 
     animation.autoreverses = YES;
-    animation.repeatCount = HUGE_VALF;
+    animation.repeatCount = HUGE_VALF; // Infinito
+    
+    // ESTO EVITA QUE SE PARE AL SALIR DE LA APP
     animation.removedOnCompletion = NO;
     animation.fillMode = kCAFillModeForwards;
 
-    [self.layer addAnimation:animation forKey:@"persistentLoop"];
+    [self.layer addAnimation:animation forKey:@"keepMovingLoop"];
 }
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    // Solución al warning de dealloc
-    #if !__has_feature(objc_arc)
-    [super dealloc];
-    #endif
 }
 
 @end
 
-// --- LÓGICA DE INYECCIÓN (SWIZZLING) ---
+// --- INYECCIÓN AUTOMÁTICA EN WATUSI ---
 
-void swizzleMethod(Class class, SEL originalSelector, SEL swizzledSelector) {
-    Method originalMethod = class_getInstanceMethod(class, originalSelector);
-    Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
-    method_exchangeImplementations(originalMethod, swizzledMethod);
-}
+static void (*orig_viewDidAppear)(UIViewController *, SEL, BOOL);
 
-@interface UIViewController (WatusiFix)
-- (void)new_viewDidAppear:(BOOL)animated;
-@end
+void hooked_viewDidAppear(UIViewController *self, SEL _cmd, BOOL animated) {
+    // Ejecuta la función original de Watusi
+    orig_viewDidAppear(self, _cmd, animated);
 
-@implementation UIViewController (WatusiFix)
-- (void)new_viewDidAppear:(BOOL)animated {
-    [self new_viewDidAppear:animated]; // Llama al original
-
-    // Verificamos si estamos en la pantalla de bloqueo de Watusi
+    // Solo actuar si es la pantalla de bloqueo
     if ([NSStringFromClass([self class]) isEqualToString:@"WatusiLockViewController"]) {
-        DynamicBackgroundView *existingBg = [self.view viewWithTag:888];
-        if (!existingBg) {
+        DynamicBackgroundView *bg = [self.view viewWithTag:888];
+        if (!bg) {
             DynamicBackgroundView *dynamicBg = [[DynamicBackgroundView alloc] initWithFrame:self.view.bounds];
             [self.view insertSubview:dynamicBg atIndex:0];
         } else {
-            [existingBg startInfiniteAnimation];
+            [bg startInfiniteAnimation];
         }
     }
 }
-@end
 
-// Esto se ejecuta automáticamente al cargar la dylib
+// ESTO SE EJECUTA SOLO AL CARGAR LA DYLIB
 __attribute__((constructor))
-static void initialize() {
+static void init() {
     Class targetClass = NSClassFromString(@"WatusiLockViewController");
     if (targetClass) {
-        swizzleMethod(targetClass, @selector(viewDidAppear:), @selector(new_viewDidAppear:));
+        Method origMethod = class_getInstanceMethod(targetClass, @selector(viewDidAppear:));
+        orig_viewDidAppear = (void *)method_getImplementation(origMethod);
+        method_setImplementation(origMethod, (IMP)hooked_viewDidAppear);
     }
 }
