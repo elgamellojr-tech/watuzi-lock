@@ -1,16 +1,16 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-@interface TransparentHook : NSObject
+@interface RevaUIFullLock : NSObject
 @end
 
-@implementation TransparentHook
+@implementation RevaUIFullLock
 
 + (void)load {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         
-        // 1. Hook para la barra superior y extender el layout al chat
+        // 1. Hook para Barra Superior y Extensión de Fondo
         Class chatClass = NSClassFromString(@"WAChatViewController");
         SEL viewSel = @selector(viewWillAppear:);
         Method origViewMethod = class_getInstanceMethod(chatClass, viewSel);
@@ -22,26 +22,27 @@
             UIViewController *vc = (UIViewController *)self;
             UINavigationBar *navBar = vc.navigationController.navigationBar;
             
-            // Barra superior transparente
+            // Hacer transparente la barra de navegación (nombre contacto)
             [navBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
             [navBar setShadowImage:[UIImage new]];
             [navBar setTranslucent:YES];
             [navBar setBackgroundColor:[UIColor clearColor]];
             
-            // Forzar que el chat ocupe TODA la pantalla (detrás de las barras)
+            // Extender el layout para que el fondo se vea sin límites (detrás de las barras)
             vc.edgesForExtendedLayout = UIRectEdgeAll;
             vc.extendedLayoutIncludesOpaqueBars = YES;
 
-            // Hacer que la tabla de mensajes sea transparente
+            // Transparencia en la tabla de mensajes
             if ([vc respondsToSelector:@selector(tableView)]) {
                 UITableView *tableView = [vc performSelector:@selector(tableView)];
-                tableView.backgroundColor = [UIColor clearColor];
-                tableView.backgroundView = nil;
+                [tableView setBackgroundColor:[UIColor clearColor]];
+                [tableView setSeparatorStyle:UITableViewCellSeparatorStyleNone];
+                [tableView setBackgroundView:nil];
             }
         };
         method_setImplementation(origViewMethod, imp_implementationWithBlock(newViewBlock));
 
-        // 2. Hook para la barra de escritura (WAMessageInputView)
+        // 2. Hook para Barra de Escritura (Input Bar)
         Class inputClass = NSClassFromString(@"WAMessageInputView");
         SEL layoutSel = @selector(layoutSubviews);
         Method origLayoutMethod = class_getInstanceMethod(inputClass, layoutSel);
@@ -54,7 +55,7 @@
             [inputView setBackgroundColor:[UIColor clearColor]];
             [inputView setOpaque:NO];
             
-            // Eliminar fondos de sistema (Blur/Grises)
+            // Ocultar fondos del sistema y efectos de desenfoque (blur)
             for (UIView *subview in inputView.subviews) {
                 if ([subview isKindOfClass:NSClassFromString(@"UIVisualEffectView")] || 
                     [subview isKindOfClass:NSClassFromString(@"_UIBarBackground")]) {
@@ -65,7 +66,7 @@
         };
         method_setImplementation(origLayoutMethod, imp_implementationWithBlock(newLayoutBlock));
 
-        // 3. Hook para eliminar el color de fondo por defecto del chat
+        // 3. Hook para la Vista de Wallpaper (Asegurar transparencia total)
         Class wallpaperClass = NSClassFromString(@"WAWallpaperView");
         SEL wallSel = @selector(layoutSubviews);
         Method origWallMethod = class_getInstanceMethod(wallpaperClass, wallSel);
@@ -74,7 +75,6 @@
         id newWallBlock = ^(id self) {
             origWallImp(self, wallSel);
             [(UIView *)self setBackgroundColor:[UIColor clearColor]];
-            [(UIView *)self setAlpha:1.0]; // Asegura que no se oculte el wallpaper
         };
         method_setImplementation(origWallMethod, imp_implementationWithBlock(newWallBlock));
     });
