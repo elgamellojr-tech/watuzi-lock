@@ -1,46 +1,49 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
-%hook WABubbleView
+// Declaraciones para evitar advertencias de compilación
+@interface UIView (Reva)
+- (void)setTailStyle:(NSInteger)style;
+@end
 
-- (void)layoutSubviews {
-    %orig;
+static void (*orig_layoutSubviews)(UIView *, SEL);
 
-    // Obtenemos el color que el tema tiene asignado actualmente
-    // 'tintColor' suele heredar el color del tema activo en WhatsApp
-    UIColor *themeColor = self.tintColor;
-    
-    // Determinamos si es enviado o recibido por la posición
-    BOOL isOutgoing = (self.frame.origin.x > 60);
+static void hooked_layoutSubviews(UIView *self, SEL _cmd) {
+    // Llamada al método original
+    orig_layoutSubviews(self, _cmd);
 
-    // Fondo con transparencia dinámica basado en el color del tema
-    // Si prefieres fondo oscuro siempre, deja [UIColor blackColor]
-    self.layer.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4].CGColor;
-    
-    self.layer.borderWidth = 1.6;
-    self.layer.cornerRadius = 14;
-    self.layer.masksToBounds = YES;
+    if ([NSStringFromClass([self class]) isEqualToString:@"WABubbleView"]) {
+        
+        // Detectar si es enviado o recibido por posición
+        BOOL isOutgoing = (self.frame.origin.x > 60);
+        
+        // Estilo Reva UI
+        self.layer.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4].CGColor;
+        self.layer.borderWidth = 1.6;
+        self.layer.cornerRadius = 14;
+        self.layer.masksToBounds = YES;
 
-    if (isOutgoing) {
-        // El borde toma el color del tema actual (el que elijas en ajustes)
-        self.layer.borderColor = themeColor.CGColor;
-    } else {
-        // Para recibidos, un gris adaptativo que funciona con modo claro/oscuro
-        self.layer.borderColor = [[UIColor grayColor] colorWithAlphaComponent:0.5].CGColor;
-    }
+        if (isOutgoing) {
+            // Adaptable al color del tema (tintColor)
+            self.layer.borderColor = self.tintColor.CGColor;
+        } else {
+            self.layer.borderColor = [[UIColor grayColor] colorWithAlphaComponent:0.5].CGColor;
+        }
 
-    // Forzar la eliminación de la cola del mensaje (estilo Reva)
-    if ([self respondsToSelector:@selector(setTailStyle:)]) {
-        [self setValue:@0 forKey:@"tailStyle"];
+        // Quitar la cola (Tail) del mensaje
+        if ([self respondsToSelector:@selector(setTailStyle:)]) {
+            [self setTailStyle:0];
+        }
     }
 }
 
-%end
-
-// Hook para asegurar que el color cambie inmediatamente al cambiar el tema
-%hook WATheme
-- (void)didUpdateTheme {
-    %orig;
-    // Notifica a las vistas que deben redibujarse con los nuevos colores
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"WAThemeChangedNotification" object:nil];
+// Constructor que se ejecuta al cargar el dylib
+__attribute__((constructor))
+static void init() {
+    Class targetClass = objc_getClass("WABubbleView");
+    if (targetClass) {
+        Method method = class_getInstanceMethod(targetClass, @selector(layoutSubviews));
+        orig_layoutSubviews = (void *)method_getImplementation(method);
+        method_setImplementation(method, (IMP)hooked_layoutSubviews);
+    }
 }
-%end
