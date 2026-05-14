@@ -2,94 +2,103 @@
 #import <objc/runtime.h>
 
 // ============================================================================
-// BYPASS GLOBAL DIRECTO A LAS VARIABLES INTERNAS
+// HOOKS LÓGICOS UNIVERSALES
 // ============================================================================
+BOOL hook_AlwaysYES(id self, SEL _cmd) { return YES; }
+BOOL hook_AlwaysNO(id self, SEL _cmd) { return NO; }
+CGFloat hook_AlwaysZero(id self, SEL _cmd) { return 0.0; }
 
-// Fuerza a cualquier método booleano de Watusi a retornar SIEMPRE verdadero o falso según corresponda
-BOOL hook_ReturnYES(id self, SEL _cmd) { return YES; }
-BOOL hook_ReturnNO(id self, SEL _cmd) { return NO; }
-CGFloat hook_ReturnZero(id self, SEL _cmd) { return 0.0; }
+// Bloquea llamadas que intentan descargar o pedir anuncios de la red
+void hook_BlockAdRequest(id self, SEL _cmd, id request) { }
+void hook_BlockVoid(id self, SEL _cmd) { }
 
-// Interceptamos el constructor original de WatusiManager
-static id (*original_WatusiManager_init)(id, SEL);
+// ============================================================================
+// INTERCEPCIÓN AGRESIVA DE CONFIGURACIONES (NSUserDefaults)
+// ============================================================================
+static bool (*original_boolForKey)(id, SEL, NSString *);
 
-id custom_WatusiManager_init(id self, SEL _cmd) {
-    self = original_WatusiManager_init(self, _cmd);
-    if (self) {
-        // Forzamos las variables de instancia internas (ivars) si existen
-        NSArray *ivars = @[@"_isPurchased", @"_adsRemoved", @"_isAdFree", @"_premium"];
-        for (NSString *ivarName in ivars) {
-            Ivar ivar = class_getInstanceVariable([self class], [ivarName UTF8String]);
-            if (ivar) {
-                // Setea el valor booleano directamente en la dirección de memoria del objeto (YES = 1)
-                BOOL premiumValue = YES;
-                object_setIvar(self, ivar, (id)@(premiumValue));
-            }
-        }
+bool custom_boolForKey(id self, SEL _cmd, NSString *defaultName) {
+    // Si Watusi pregunta por cualquiera de estas llaves de configuración, le aseguramos que ya pagó
+    if ([defaultName isEqualToString:@"WatusiPurchased"] || 
+        [defaultName isEqualToString:@"WatusiAdsRemoved"] || 
+        [defaultName isEqualToString:@"HideAds"] ||
+        [defaultName isEqualToString:@"isAdFree"] ||
+        [defaultName isEqualToString:@"PremiumEnabled"]) {
+        return YES;
     }
-    return self;
+    
+    // Si pregunta si debe mostrar anuncios, le decimos rotundamente que NO
+    if ([defaultName isEqualToString:@"ShowAds"] || 
+        [defaultName isEqualToString:@"WatusiShowAds"]) {
+        return NO;
+    }
+    
+    return original_boolForKey(self, _cmd, defaultName);
 }
 
-// Ocultación total de las subvistas de anuncios
-void hook_ForceHideAdView(id self, SEL _cmd) {
+// ============================================================================
+// DESTRUCCIÓN DE VISTAS REMANENTES
+// ============================================================================
+void hook_CleanAdView(id self, SEL _cmd) {
     UIView *view = (UIView *)self;
     view.hidden = YES;
     view.alpha = 0.0;
-    
-    // CAMBIO CLAVE: Usamos CGRectMake directo para evitar la dependencia de CoreGraphics externa
     [view setFrame:CGRectMake(0, 0, 0, 0)];
-    
     for (UIView *subview in view.subviews) {
         [subview removeFromSuperview];
     }
 }
 
 // ============================================================================
-// CONSTRUCTOR CENTRAL (INYECTOR ANTIANUNCIOS AVANZADO)
+// CONSTRUCTOR CENTRAL (ANTIANUNCIOS ELITE)
 // ============================================================================
-__attribute__((constructor)) static void initWatusiAntiAdsAdvanced() {
+__attribute__((constructor)) static void initWatusiAntiAdsElite() {
     
+    // 1. SWIZZLING DE ALTO NIVEL A NSUSERDEFAULTS (Bypass de almacenamiento local)
+    Method origBoolForKey = class_getInstanceMethod([NSUserDefaults class], @selector(boolForKey:));
+    if (origBoolForKey) {
+        original_boolForKey = (void *)method_getImplementation(origBoolForKey);
+        method_setImplementation(origBoolForKey, (IMP)custom_boolForKey);
+    }
+    
+    // 2. DOBLE CAPA SOBRE EL CONTROLADOR PRINCIPAL
     Class watusiManager = NSClassFromString(@"WatusiManager");
     if (watusiManager) {
-        // 1. Swizzling del init para forzar variables internas en memoria
-        Method origInitMethod = class_getInstanceMethod(watusiManager, @selector(init));
-        if (origInitMethod) {
-            original_WatusiManager_init = (void *)method_getImplementation(origInitMethod);
-            method_setImplementation(origInitMethod, (IMP)custom_WatusiManager_init);
+        NSArray *yesSelectors = @[@"isPurchased", @"adsRemoved", @"isAdFree", @"isPremium", @"purchased"];
+        for (NSString *sel in yesSelectors) {
+            class_replaceMethod(watusiManager, NSSelectorFromString(sel), (IMP)hook_AlwaysYES, "B@:");
         }
         
-        // 2. Lista masiva de selectores de compra posibles en Watusi (viejos y nuevos)
-        NSArray *selectorsYES = @[@"isPurchased", @"adsRemoved", @"isAdFree", @"isPremium", @"purchased"];
-        for (NSString *selName in selectorsYES) {
-            class_replaceMethod(watusiManager, NSSelectorFromString(selName), (IMP)hook_ReturnYES, "B@:");
-        }
-        
-        NSArray *selectorsNO = @[@"shouldShowAds", @"showAds", @"displayAds", @"bannerEnabled"];
-        for (NSString *selName in selectorsNO) {
-            class_replaceMethod(watusiManager, NSSelectorFromString(selName), (IMP)hook_ReturnNO, "B@:");
+        NSArray *noSelectors = @[@"shouldShowAds", @"showAds", @"displayAds", @"bannerEnabled"];
+        for (NSString *sel in noSelectors) {
+            class_replaceMethod(watusiManager, NSSelectorFromString(sel), (IMP)hook_AlwaysNO, "B@:");
         }
     }
     
-    // 3. Bloqueo físico de celdas y contenedores de publicidad (Cualquier remanente visual)
+    // 3. SECTOR DE CLASES INTERNAS Y DE PROVEEDORES (AdMob, FB, Watusi Nativo)
     NSArray *adClasses = @[
         @"WatusiAdCell", @"WATAdCell", 
         @"WatusiBannerView", @"WATAdBannerRow", 
         @"WatusiMediaAdView", @"WATAdView",
-        @"FBRewardedVideoAd", @"GADBannerView", // Bloquea también si usa Facebook Ads o Google AdMob nativo
-        @"GADInAppPurchase", @"GADMAdNetworkConnector"
+        @"GADBannerView", @"DFPBannerView", 
+        @"GADAdLoader", @"BAnationAdView"
     ];
     
     for (NSString *className in adClasses) {
-        Class targetAdClass = NSClassFromString(className);
-        if (targetAdClass) {
-            // Quitamos la altura por completo
-            class_replaceMethod(targetAdClass, NSSelectorFromString(@"cellHeight"), (IMP)hook_ReturnZero, "d@:");
-            class_replaceMethod(targetAdClass, NSSelectorFromString(@"desiredHeight"), (IMP)hook_ReturnZero, "d@:");
-            class_replaceMethod(targetAdClass, NSSelectorFromString(@"height"), (IMP)hook_ReturnZero, "d@:");
+        Class targetClass = NSClassFromString(className);
+        if (targetClass) {
+            // Forzar tamaños a cero
+            class_replaceMethod(targetClass, NSSelectorFromString(@"cellHeight"), (IMP)hook_AlwaysZero, "d@:");
+            class_replaceMethod(targetClass, NSSelectorFromString(@"desiredHeight"), (IMP)hook_AlwaysZero, "d@:");
+            class_replaceMethod(targetClass, NSSelectorFromString(@"height"), (IMP)hook_AlwaysZero, "d@:");
             
-            // Forzamos a que si la vista intenta dibujarse, se autodestruya
-            class_replaceMethod(targetAdClass, @selector(layoutSubviews), (IMP)hook_ForceHideAdView, "v@:");
-            class_replaceMethod(targetAdClass, @selector(didMoveToWindow), (IMP)hook_ForceHideAdView, "v@:");
+            // Interceptar la inicialización y la carga de peticiones en red de Google AdMob
+            class_replaceMethod(targetClass, NSSelectorFromString(@"loadRequest:"), (IMP)hook_BlockAdRequest, "v@:@");
+            class_replaceMethod(targetClass, NSSelectorFromString(@"loadAd:"), (IMP)hook_BlockAdRequest, "v@:@");
+            
+            // Romper el ciclo de dibujado de la interfaz
+            class_replaceMethod(targetClass, @selector(layoutSubviews), (IMP)hook_CleanAdView, "v@:");
+            class_replaceMethod(targetClass, @selector(didMoveToWindow), (IMP)hook_CleanAdView, "v@:");
         }
     }
 }
