@@ -21,14 +21,12 @@ static UIButton *floatingMenuButton = nil;
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    // Inicializar valores por defecto si están vacíos
     if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
     if (!self.currentVisualAvatarColor) self.currentVisualAvatarColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
     
     self.title = @"DOMIDIOS MENU";
     self.view.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0];
     
-    // Botón nativo superior para cerrar el menú y regresar a WhatsApp
     UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithTitle:@"Minimize" 
                                                                     style:UIBarButtonItemStyleDone 
                                                                    target:self 
@@ -36,7 +34,6 @@ static UIButton *floatingMenuButton = nil;
     closeButton.tintColor = [UIColor redColor];
     self.navigationItem.rightBarButtonItem = closeButton;
     
-    // Configurar la Tabla
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
@@ -50,7 +47,6 @@ static UIButton *floatingMenuButton = nil;
 
 - (void)dismissMenu {
     [self dismissViewControllerAnimated:YES completion:^{
-        // Volver a mostrar el botón flotante al cerrar la interfaz completa
         if (floatingMenuButton) {
             floatingMenuButton.hidden = NO;
         }
@@ -249,7 +245,7 @@ static UIButton *floatingMenuButton = nil;
         
         self.currentVisualAvatarColor = newColor;
         self.avatarImageView.backgroundColor = newColor;
-        [self.tableView reloadData];
+        [tableView reloadData];
     }
 }
 @end
@@ -267,8 +263,6 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
     
     if ([sender state] == UIGestureRecognizerStateChanged) {
         piece.center = CGPointMake(piece.center.x + translation.x, piece.center.y + translation.y);
-        
-        // Solución definitiva al error de llaves: Inicialización limpia directa compatible con C99/Clang
         CGPoint zeroPoint = {0, 0};
         [sender setTranslation:zeroPoint inView:piece.superview];
     }
@@ -279,40 +273,4 @@ static void floatingButtonTapped() {
     if (@available(iOS 13.0, *)) {
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
-                for (UIWindow *window in scene.windows) {
-                    if (window.isKeyWindow) { windowPrincipal = window; break; }
-                }
-            }
-        }
-    }
-    if (!windowPrincipal) {
-        windowPrincipal = [UIApplication sharedApplication].keyWindow;
-    }
-    
-    UIViewController *rootVC = windowPrincipal.rootViewController;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
-    }
-    
-    if (floatingMenuButton) {
-        floatingMenuButton.hidden = YES;
-    }
-    
-    DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
-    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
-    navController.modalPresentationStyle = UIModalPresentationFullScreen;
-    [rootVC presentViewController:navController animated:YES completion:nil];
-}
-
-static void (*original_viewDidAppear)(id, SEL, BOOL);
-
-void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
-    original_viewDidAppear(self, _cmd, animated);
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIViewController *currentVC = (UIViewController *)self;
-        
-        floatingMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        floatingMenuButton.frame = CGRectMake(currentVC.view.frame.size.width - 75, currentVC.view.frame.size.height - 160, 55, 55);
-        floatingMenuButton.backgroundColor = [UIColor colorWith
+                for (UI
