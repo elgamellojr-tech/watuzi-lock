@@ -71,7 +71,7 @@ static void verificarYCrearMonitor() {
         CGFloat labelHeight = 26;
         CGFloat screenWidth = keyWin.frame.size.width;
         CGFloat posX = (screenWidth - labelWidth) / 2.0;
-        CGFloat posY = 46; // Altura premium pegada a la Isla Dinámica
+        CGFloat posY = 55; // Altura premium pegada a la Isla Dinámica
         
         networkSpeedLabel = [[UILabel alloc] initWithFrame:CGRectMake(posX, posY, labelWidth, labelHeight)];
         networkSpeedLabel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:0.85];
