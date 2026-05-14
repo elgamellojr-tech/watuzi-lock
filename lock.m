@@ -1,46 +1,55 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// Declaraciones para evitar advertencias de compilación
-@interface UIView (Reva)
-- (void)setTailStyle:(NSInteger)style;
-@end
+// Función para aplicar el estilo Reva a una vista
+static void applyRevaStyle(UIView *view, BOOL isOutgoing) {
+    view.layer.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4].CGColor;
+    view.layer.borderWidth = 1.6;
+    view.layer.cornerRadius = 14;
+    view.layer.masksToBounds = YES;
 
-static void (*orig_layoutSubviews)(UIView *, SEL);
+    if (isOutgoing) {
+        // Borde color del tema para enviados
+        view.layer.borderColor = view.tintColor.CGColor;
+    } else {
+        // Borde gris suave para recibidos
+        view.layer.borderColor = [[UIColor grayColor] colorWithAlphaComponent:0.5].CGColor;
+    }
 
-static void hooked_layoutSubviews(UIView *self, SEL _cmd) {
-    // Llamada al método original
+    // Intentar quitar la cola (tail) si existe el método
+    if ([view respondsToSelector:NSSelectorFromString(@"setTailStyle:")]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [view performSelector:NSSelectorFromString(@"setTailStyle:") withObject:0];
+        #pragma clang diagnostic pop
+    }
+}
+
+static void (*orig_layoutSubviews)(UITableViewCell *, SEL);
+
+static void hooked_layoutSubviews(UITableViewCell *self, SEL _cmd) {
     orig_layoutSubviews(self, _cmd);
 
-    if ([NSStringFromClass([self class]) isEqualToString:@"WABubbleView"]) {
-        
-        // Detectar si es enviado o recibido por posición
-        BOOL isOutgoing = (self.frame.origin.x > 60);
-        
-        // Estilo Reva UI
-        self.layer.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4].CGColor;
-        self.layer.borderWidth = 1.6;
-        self.layer.cornerRadius = 14;
-        self.layer.masksToBounds = YES;
-
-        if (isOutgoing) {
-            // Adaptable al color del tema (tintColor)
-            self.layer.borderColor = self.tintColor.CGColor;
-        } else {
-            self.layer.borderColor = [[UIColor grayColor] colorWithAlphaComponent:0.5].CGColor;
-        }
-
-        // Quitar la cola (Tail) del mensaje
-        if ([self respondsToSelector:@selector(setTailStyle:)]) {
-            [self setTailStyle:0];
+    // Buscamos la burbuja dentro de la celda del chat
+    // Normalmente las clases de WhatsApp empiezan con 'WA'
+    NSString *className = NSStringFromClass([self class]);
+    if ([className containsString:@"MessageCell"]) {
+        for (UIView *subview in self.contentView.subviews) {
+            // Buscamos la vista que contiene el mensaje (la burbuja)
+            if ([NSStringFromClass([subview class]) containsString:@"BubbleView"]) {
+                BOOL isOutgoing = (subview.frame.origin.x > 60);
+                applyRevaStyle(subview, isOutgoing);
+            }
         }
     }
 }
 
-// Constructor que se ejecuta al cargar el dylib
 __attribute__((constructor))
 static void init() {
-    Class targetClass = objc_getClass("WABubbleView");
+    // Hookeamos la celda de mensaje, que es más estable que la burbuja sola
+    Class targetClass = objc_getClass("WATextMessageCell");
+    if (!targetClass) targetClass = objc_getClass("WAMessageChatTableViewCell");
+
     if (targetClass) {
         Method method = class_getInstanceMethod(targetClass, @selector(layoutSubviews));
         orig_layoutSubviews = (void *)method_getImplementation(method);
