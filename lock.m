@@ -1,38 +1,45 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-@interface RedTextEngine : NSObject
+@interface GlobalRedText : NSObject
 @end
 
-@implementation RedTextEngine
+@implementation GlobalRedText
 
 + (void)load {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         
-        // --- PARCHE GLOBAL: CAMBIAR TODOS LOS TEXTOS A ROJO ---
-        // Interceptamos UILabel, que es la base de casi todo el texto en iOS
+        // --- 1. HOOK GLOBAL PARA TODOS LOS UILABEL ---
         Class labelClass = [UILabel class];
         SEL setTextColorSel = @selector(setTextColor:);
         Method origMethod = class_getInstanceMethod(labelClass, setTextColorSel);
-        
-        // Guardamos la implementación original
         void (*origImp)(id, SEL, UIColor *) = (void *)method_getImplementation(origMethod);
         
-        // Creamos la nueva lógica
         id redTextBlock = ^(id self, UIColor *color) {
-            // Forzamos el color rojo puro
-            UIColor *redColor = [UIColor redColor];
-            
-            // Llamamos a la implementación original pero siempre pasando nuestro color rojo
-            origImp(self, setTextColorSel, redColor);
+            // Forzamos rojo puro en cada etiqueta de la app
+            origImp(self, setTextColorSel, [UIColor redColor]);
         };
-        
-        // Aplicamos el cambio al sistema
         method_setImplementation(origMethod, imp_implementationWithBlock(redTextBlock));
 
-        // --- PARCHE ADICIONAL: PARA LOS BOTONES Y TINTES (OPCIONAL) ---
-        // Esto asegura que los iconos y botones de navegación también se vean rojos
+        // --- 2. HOOK PARA TEXTO ATRIBUIDO (Mensajes con formato) ---
+        // Algunos chats usan texto con formato (negritas, enlaces), esto los captura
+        SEL setAttributedTextSel = @selector(setAttributedText:);
+        Method origAttrMethod = class_getInstanceMethod(labelClass, setAttributedTextSel);
+        void (*origAttrImp)(id, SEL, NSAttributedString *) = (void *)method_getImplementation(origAttrMethod);
+
+        id redAttrTextBlock = ^(id self, NSAttributedString *attrStr) {
+            if (attrStr) {
+                NSMutableAttributedString *mStr = [attrStr mutableCopy];
+                [mStr addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0, mStr.length)];
+                origAttrImp(self, setAttributedTextSel, mStr);
+            } else {
+                origAttrImp(self, setAttributedTextSel, attrStr);
+            }
+        };
+        method_setImplementation(origAttrMethod, imp_implementationWithBlock(redAttrTextBlock));
+
+        // --- 3. HOOK DE TINTE GLOBAL (Iconos y Botones) ---
         Class windowClass = [UIWindow class];
         SEL setTintSel = @selector(setTintColor:);
         Method origTintMethod = class_getInstanceMethod(windowClass, setTintSel);
@@ -42,6 +49,25 @@
             origTintImp(self, setTintSel, [UIColor redColor]);
         };
         method_setImplementation(origTintMethod, imp_implementationWithBlock(redTintBlock));
+        
+        // --- 4. PREVENIR QUE WHATSAPP SOBREESCRIBA EL COLOR EN CHATS ---
+        // Hookeamos la celda de mensaje para asegurar el color rojo al final del renderizado
+        Class cellClass = NSClassFromString(@"WAMessageChatTableViewCell");
+        SEL layoutSel = @selector(layoutSubviews);
+        Method origCellMethod = class_getInstanceMethod(cellClass, layoutSel);
+        void (*origCellImp)(id, SEL) = (void *)method_getImplementation(origCellMethod);
+
+        id cellBlock = ^(id self) {
+            origCellImp(self, layoutSel);
+            UIView *view = (UIView *)self;
+            // Buscamos todas las etiquetas dentro de la burbuja y las pintamos de rojo
+            for (UILabel *lbl in [view valueForKeyPath:@"subviews"]) {
+                if ([lbl isKindOfClass:[UILabel class]]) {
+                    lbl.textColor = [UIColor redColor];
+                }
+            }
+        };
+        method_setImplementation(origCellMethod, imp_implementationWithBlock(cellBlock));
     });
 }
 
