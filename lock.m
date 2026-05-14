@@ -268,6 +268,51 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
     if ([sender state] == UIGestureRecognizerStateChanged) {
         piece.center = CGPointMake(piece.center.x + translation.x, piece.center.y + translation.y);
         
-        // Corrección del error: Estructura limpia e inicializada a cero directamente para el compilador
-        CGPoint zeroPoint;
-        zeroPoint.x = 0;
+        // Solución definitiva al error de llaves: Inicialización limpia directa compatible con C99/Clang
+        CGPoint zeroPoint = {0, 0};
+        [sender setTranslation:zeroPoint inView:piece.superview];
+    }
+}
+
+static void floatingButtonTapped() {
+    UIWindow *windowPrincipal = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                for (UIWindow *window in scene.windows) {
+                    if (window.isKeyWindow) { windowPrincipal = window; break; }
+                }
+            }
+        }
+    }
+    if (!windowPrincipal) {
+        windowPrincipal = [UIApplication sharedApplication].keyWindow;
+    }
+    
+    UIViewController *rootVC = windowPrincipal.rootViewController;
+    while (rootVC.presentedViewController) {
+        rootVC = rootVC.presentedViewController;
+    }
+    
+    if (floatingMenuButton) {
+        floatingMenuButton.hidden = YES;
+    }
+    
+    DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
+    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
+    navController.modalPresentationStyle = UIModalPresentationFullScreen;
+    [rootVC presentViewController:navController animated:YES completion:nil];
+}
+
+static void (*original_viewDidAppear)(id, SEL, BOOL);
+
+void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
+    original_viewDidAppear(self, _cmd, animated);
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        UIViewController *currentVC = (UIViewController *)self;
+        
+        floatingMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        floatingMenuButton.frame = CGRectMake(currentVC.view.frame.size.width - 75, currentVC.view.frame.size.height - 160, 55, 55);
+        floatingMenuButton.backgroundColor = [UIColor colorWith
