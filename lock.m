@@ -1,41 +1,40 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
-// --- TRANSPARENCIA EN LA BARRA SUPERIOR (NAV BAR) ---
-// Hookeamos el controlador del chat para modificar la barra de navegación
-%hook WAChatViewController
+// Importamos las funciones de Cydia Substrate
+#include <substrate.h>
 
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
+// --- Hook para WAChatViewController ---
+static void (*orig_WAChatViewController_viewWillAppear)(id, SEL, BOOL);
+void replaced_WAChatViewController_viewWillAppear(id self, SEL _cmd, BOOL animated) {
+    orig_WAChatViewController_viewWillAppear(self, _cmd, animated);
     
-    // Accedemos a la barra de navegación
-    UINavigationBar *navBar = self.navigationController.navigationBar;
+    // Obtenemos la Navigation Bar
+    UINavigationController *navController = [self performSelector:@selector(navigationController)];
+    UINavigationBar *navBar = navController.navigationBar;
     
-    // Eliminamos el fondo y la línea divisoria
+    // Transparencia total
     [navBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
     [navBar setShadowImage:[UIImage new]];
     [navBar setTranslucent:YES];
     [navBar setBackgroundColor:[UIColor clearColor]];
     
-    // Forzamos a que el contenido del chat suba hasta arriba de la pantalla
-    self.edgesForExtendedLayout = UIRectEdgeAll;
-    self.extendedLayoutIncludesOpaqueBars = YES;
+    // Extender el layout
+    [(UIViewController *)self setEdgesForExtendedLayout:UIRectEdgeAll];
+    [(UIViewController *)self setExtendedLayoutIncludesOpaqueBars:YES];
 }
 
-%end
-
-// --- TRANSPARENCIA EN LA BARRA DE ESCRITURA (INPUT BAR) ---
-// Hookeamos la vista de entrada de mensajes
-%hook WAMessageInputView
-
-- (void)layoutSubviews {
-    %orig;
+// --- Hook para WAMessageInputView ---
+static void (*orig_WAMessageInputView_layoutSubviews)(id, SEL);
+void replaced_WAMessageInputView_layoutSubviews(id self, SEL _cmd) {
+    orig_WAMessageInputView_layoutSubviews(self, _cmd);
     
-    // Hacemos el fondo de la vista transparente
-    [self setBackgroundColor:[UIColor clearColor]];
-    [self setOpaque:NO];
+    UIView *inputView = (UIView *)self;
+    [inputView setBackgroundColor:[UIColor clearColor]];
+    [inputView setOpaque:NO];
 
-    // Buscamos y ocultamos el fondo difuminado (UIVisualEffectView) que usa WhatsApp
-    for (UIView *subview in self.subviews) {
+    // Ocultar capas de fondo/blur
+    for (UIView *subview in inputView.subviews) {
         if ([subview isKindOfClass:NSClassFromString(@"UIVisualEffectView")] || 
             [subview isKindOfClass:NSClassFromString(@"_UIBarBackground")]) {
             [subview setHidden:YES];
@@ -44,13 +43,18 @@
     }
 }
 
-%end
-
-// --- COMPATIBILIDAD CON EL CONTENEDOR DE LA BARRA ---
-%hook WAMessageInputContainerView
-- (void)layoutSubviews {
-    %orig;
-    [self setBackgroundColor:[UIColor clearColor]];
-    [self setOpaque:NO];
+// --- Constructor (Se ejecuta al cargar el dylib) ---
+__attribute__((constructor))
+static void initialize() {
+    // Hooking WAChatViewController
+    MSHookMessageEx(NSClassFromString(@"WAChatViewController"), 
+                    @selector(viewWillAppear:), 
+                    (IMP)replaced_WAChatViewController_viewWillAppear, 
+                    (IMP *)&orig_WAChatViewController_viewWillAppear);
+    
+    // Hooking WAMessageInputView
+    MSHookMessageEx(NSClassFromString(@"WAMessageInputView"), 
+                    @selector(layoutSubviews), 
+                    (IMP)replaced_WAMessageInputView_layoutSubviews, 
+                    (IMP *)&orig_WAMessageInputView_layoutSubviews);
 }
-%end
