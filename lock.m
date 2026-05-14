@@ -53,7 +53,7 @@ static void updateNetworkSpeed() {
 }
 
 // ============================================================================
-// INYECCIÓN VISUAL BAJO LA ISLA DINÁMICA
+// INYECCIÓN VISUAL CORREGIDA (MÁS ARRIBA)
 // ============================================================================
 static void (*original_viewDidAppear)(id, SEL, BOOL);
 
@@ -69,14 +69,14 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
         CGFloat labelWidth = 190;
         CGFloat labelHeight = 26;
         
-        // Calculamos el centro horizontal exacto de la pantalla del iPhone
+        // Centro horizontal exacto
         CGFloat screenWidth = currentVC.view.frame.size.width;
         CGFloat posX = (screenWidth - labelWidth) / 2.0;
         
-        // Posición Y calculada justo debajo de la Isla Dinámica (aprox 54 puntos arriba)
-        CGFloat posY = 54;
+        // Ajustado más arriba (De 54 bajó a 44 para pegarse a la Isla Dinámica)
+        CGFloat posY = 44;
         
-        // Crear el diseño idéntico en negro traslúcido
+        // Crear el diseño en negro traslúcido
         networkSpeedLabel = [[UILabel alloc] initWithFrame:CGRectMake(posX, posY, labelWidth, labelHeight)];
         networkSpeedLabel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:0.85];
         networkSpeedLabel.textColor = [UIColor whiteColor];
@@ -93,7 +93,6 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
                 [keyWin addSubview:networkSpeedLabel];
                 [keyWin bringSubviewToFront:networkSpeedLabel];
                 
-                // Temporizador para refrescar los datos cada segundo
                 [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
                     updateNetworkSpeed();
                 }];
