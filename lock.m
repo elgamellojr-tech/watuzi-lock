@@ -1,40 +1,88 @@
 #import <UIKit/UIKit.h>
 
-%hook WAMessageCell
+// Declaramos las clases de WhatsApp para que el compilador no de error
+@interface WAChatViewController : UIViewController
+@end
+
+@interface ProfileViewController : UIViewController
+@property (nonatomic, strong) UIView *containerView;
+@end
+
+// --- LÓGICA DE LA INTERFAZ DEL PERFIL ---
+@implementation ProfileViewController
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+    
+    // Contenedor principal (estilo image_2.png)
+    self.containerView = [[UIView alloc] initWithFrame:CGRectMake(20, 100, self.view.frame.size.width - 40, 520)];
+    self.containerView.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:1.0];
+    self.containerView.layer.cornerRadius = 25;
+    self.containerView.clipsToBounds = YES;
+    [self.view addSubview:self.containerView];
+    
+    // Banner superior
+    UIView *banner = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.containerView.frame.size.width, 130)];
+    banner.backgroundColor = [UIColor colorWithRed:0.6 green:0.0 blue:0.0 alpha:1.0]; // Color base rojo
+    [self.containerView addSubview:banner];
+
+    // Texto de Ejemplo: saint iOS
+    UILabel *userLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 160, 200, 30)];
+    userLabel.text = @"saint iOS";
+    userLabel.textColor = [UIColor whiteColor];
+    userLabel.font = [UIFont boldSystemFontOfSize:24];
+    [self.containerView addSubview:userLabel];
+
+    // Botón para cerrar
+    UIButton *close = [[UIButton alloc] initWithFrame:CGRectMake(15, 15, 30, 30)];
+    [close setTitle:@"✕" forState:UIControlStateNormal];
+    [close setBackgroundColor:[UIColor colorWithWhite:0 alpha:0.3]];
+    close.layer.cornerRadius = 15;
+    [close addTarget:self action:@selector(closeMe) forControlEvents:UIControlEventTouchUpInside];
+    [self.containerView addSubview:close];
+}
+- (void)closeMe { [self dismissViewControllerAnimated:YES completion:nil]; }
+@end
+
+
+// --- HOOKS PARA TRANSPARENCIA (image_3.png) ---
+%hook TLKTableView
 - (void)layoutSubviews {
     %orig;
+    self.backgroundColor = [UIColor clearColor];
+    self.backgroundView = nil;
+}
+%end
+
+%hook WAConversationCell
+- (void)layoutSubviews {
+    %orig;
+    // Esto quita el fondo blanco/gris de cada chat en la lista
+    self.backgroundColor = [UIColor clearColor];
+    self.contentView.backgroundColor = [UIColor clearColor];
     
-    // Hace que el fondo de las burbujas sea semi-transparente
-    UIView *bubbleView = [self valueForKey:@"_bubbleView"];
-    if (bubbleView) {
-        bubbleView.alpha = 0.6; // Ajusta este valor (0.0 a 1.0) para la transparencia
-        bubbleView.layer.cornerRadius = 15;
-        bubbleView.clipsToBounds = YES;
-    }
+    // Si quieres que se vea un poco oscuro como en image_3.png:
+    UIView *bg = [[UIView alloc] initWithFrame:self.bounds];
+    bg.backgroundColor = [UIColor colorWithWhite:0 alpha:0.2];
+    self.backgroundView = bg;
 }
 %end
 
-%hook WAVectorImageCell
-- (void)setBackgroundColor:(UIColor *)color {
-    // Forzamos que el fondo de la celda sea transparente para que se vea la imagen de fondo
-    %orig([UIColor clearColor]);
-}
-%end
-
-%hook WABackgroundView
-- (void)setImage:(UIImage *)image {
-    // Asegura que la imagen de fondo (la de image.png) ocupe toda la pantalla
-    %orig(image);
-    self.contentMode = UIViewContentModeScaleAspectFill;
-}
-%end
-
-%hook WAViewController
+// --- BOTÓN EN EL CHAT PARA ABRIR PERFIL ---
+%hook WAChatViewController
 - (void)viewDidLoad {
     %orig;
-    // Elimina colores sólidos que puedan tapar el fondo en el chat
-    if ([NSStringFromClass([self class]) containsString:@"WAChatViewController"]) {
-        self.view.backgroundColor = [UIColor clearColor];
-    }
+    UIBarButtonItem *profileItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"person.crop.circle"] 
+                                                                    style:UIBarButtonItemStylePlain 
+                                                                   target:self 
+                                                                   action:@selector(openProfileManual)];
+    self.navigationItem.rightBarButtonItems = @[profileItem];
+}
+
+%new
+- (void)openProfileManual {
+    ProfileViewController *pvc = [[ProfileViewController alloc] init];
+    pvc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    [self presentViewController:pvc animated:YES completion:nil];
 }
 %end
