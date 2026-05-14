@@ -19,7 +19,6 @@ static UIButton *floatingMenuButton = nil;
 @implementation DOMIDIOSProfileViewController
 
 - (void)viewDidLoad {
-    [super NSObject];
     [super viewDidLoad];
     
     if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
@@ -307,8 +306,43 @@ void dynamic_handlePanAction(id self, SEL _cmd, UIPanGestureRecognizer *sender) 
     handlePanGesture(sender);
 }
 
+
+// ============================================================================
+// FUNCIONES DE DESBLOQUEO PARA WATUSI (BYPASS DE COMPRA / AD-BLOCK)
+// ============================================================================
+
+BOOL hook_WatusiPurchased(id self, SEL _cmd) {
+    return YES; // Forzamos a que siempre responda que está comprado legítimamente
+}
+
+BOOL hook_WatusiPackagePurchased(id self, SEL _cmd, id package) {
+    return YES; // Desbloquea cualquier sub-paquete o versión específica de los ajustes
+}
+
+
+// ============================================================================
+// CONSTRUCTOR INYECTOR CENTRALIZADO
+// ============================================================================
+
 __attribute__((constructor)) static void initInyectorForzado() {
-    // Apuntamos directo a la vista principal de la lista de chats de WhatsApp
+    
+    // --- 1. SECCIÓN: CRACK NATIVO DE WATUSI ---
+    // Buscamos las clases encargadas de la licencia dentro del binario de Watusi
+    Class watusiManagerClass = NSClassFromString(@"WatusiManager");
+    Class watusiPackageClass = NSClassFromString(@"WatusiPackage");
+    
+    if (watusiManagerClass) {
+        // Reemplazamos métodos comunes de chequeo de comerciales y licencias
+        class_replaceMethod(watusiManagerClass, NSSelectorFromString(@"isPurchased"), (IMP)hook_WatusiPurchased, "B@:");
+        class_replaceMethod(watusiManagerClass, NSSelectorFromString(@"isPackagePurchased:"), (IMP)hook_WatusiPackagePurchased, "B@:@");
+    }
+    
+    if (watusiPackageClass) {
+        class_replaceMethod(watusiPackageClass, NSSelectorFromString(@"isPurchased"), (IMP)hook_WatusiPurchased, "B@:");
+    }
+    
+    
+    // --- 2. SECCIÓN: INYECCIÓN DE TU MENÚ INMUNE ---
     Class targetClass = NSClassFromString(@"WASingleChatListViewController");
     if (!targetClass) targetClass = NSClassFromString(@"WAHomeViewController");
     if (!targetClass) targetClass = NSClassFromString(@"WAChatListViewController");
