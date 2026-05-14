@@ -1,77 +1,46 @@
 #import <UIKit/UIKit.h>
-#import <QuartzCore/QuartzCore.h>
-#import <objc/runtime.h>
 
-@interface DynamicBackgroundView : UIView
-@end
+%hook WABubbleView
 
-@implementation DynamicBackgroundView
+- (void)layoutSubviews {
+    %orig;
 
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (self) {
-        self.userInteractionEnabled = NO;
-        self.tag = 888;
-        self.backgroundColor = [UIColor clearColor];
-        [self startInfiniteAnimation];
-        
-        [[NSNotificationCenter defaultCenter] addObserver:self 
-                                                 selector:@selector(startInfiniteAnimation) 
-                                                     name:UIApplicationDidBecomeActiveNotification 
-                                                   object:nil];
+    // Obtenemos el color que el tema tiene asignado actualmente
+    // 'tintColor' suele heredar el color del tema activo en WhatsApp
+    UIColor *themeColor = self.tintColor;
+    
+    // Determinamos si es enviado o recibido por la posición
+    BOOL isOutgoing = (self.frame.origin.x > 60);
+
+    // Fondo con transparencia dinámica basado en el color del tema
+    // Si prefieres fondo oscuro siempre, deja [UIColor blackColor]
+    self.layer.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4].CGColor;
+    
+    self.layer.borderWidth = 1.6;
+    self.layer.cornerRadius = 14;
+    self.layer.masksToBounds = YES;
+
+    if (isOutgoing) {
+        // El borde toma el color del tema actual (el que elijas en ajustes)
+        self.layer.borderColor = themeColor.CGColor;
+    } else {
+        // Para recibidos, un gris adaptativo que funciona con modo claro/oscuro
+        self.layer.borderColor = [[UIColor grayColor] colorWithAlphaComponent:0.5].CGColor;
     }
-    return self;
-}
 
-- (void)startInfiniteAnimation {
-    [self.layer removeAllAnimations];
-
-    CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"opacity"];
-    animation.fromValue = @(1.0);
-    animation.toValue = @(0.5);
-    animation.duration = 2.5; 
-    animation.autoreverses = YES;
-    animation.repeatCount = HUGE_VALF;
-    animation.removedOnCompletion = NO;
-    animation.fillMode = kCAFillModeForwards;
-
-    [self.layer addAnimation:animation forKey:@"keepMovingLoop"];
-}
-
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-    // Esto quita el warning del dealloc
-    #if !__has_feature(objc_arc)
-    [super dealloc];
-    #endif
-}
-
-@end
-
-// --- INYECCIÓN EN WATUSI ---
-
-static void (*orig_viewDidAppear)(UIViewController *, SEL, BOOL);
-
-void hooked_viewDidAppear(UIViewController *self, SEL _cmd, BOOL animated) {
-    orig_viewDidAppear(self, _cmd, animated);
-
-    if ([NSStringFromClass([self class]) isEqualToString:@"WatusiLockViewController"]) {
-        DynamicBackgroundView *bg = [self.view viewWithTag:888];
-        if (!bg) {
-            DynamicBackgroundView *dynamicBg = [[DynamicBackgroundView alloc] initWithFrame:self.view.bounds];
-            [self.view insertSubview:dynamicBg atIndex:0];
-        } else {
-            [bg startInfiniteAnimation];
-        }
+    // Forzar la eliminación de la cola del mensaje (estilo Reva)
+    if ([self respondsToSelector:@selector(setTailStyle:)]) {
+        [self setValue:@0 forKey:@"tailStyle"];
     }
 }
 
-__attribute__((constructor))
-static void init() {
-    Class targetClass = NSClassFromString(@"WatusiLockViewController");
-    if (targetClass) {
-        Method origMethod = class_getInstanceMethod(targetClass, @selector(viewDidAppear:));
-        orig_viewDidAppear = (void *)method_getImplementation(origMethod);
-        method_setImplementation(origMethod, (IMP)hooked_viewDidAppear);
-    }
+%end
+
+// Hook para asegurar que el color cambie inmediatamente al cambiar el tema
+%hook WATheme
+- (void)didUpdateTheme {
+    %orig;
+    // Notifica a las vistas que deben redibujarse con los nuevos colores
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"WAThemeChangedNotification" object:nil];
 }
+%end
