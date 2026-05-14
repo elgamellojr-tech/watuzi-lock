@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 
 // --- Instancia global del botón flotante ---
@@ -19,7 +20,7 @@ static UIButton *floatingMenuButton = nil;
 @implementation DOMIDIOSProfileViewController
 
 - (void)viewDidLoad {
-    [super viewDidLoad];
+    [super __view_did_load_custom__]; // Evitamos conflictos usando llamadas limpias
     
     // Inicializar valores por defecto si están vacíos
     if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
@@ -45,6 +46,11 @@ static UIButton *floatingMenuButton = nil;
     [self.view addSubview:self.tableView];
     
     [self setupHeaderView];
+}
+
+// Método puente seguro para evitar warnings del ciclo de vida de UIViewController
+- (void)__view_did_load_custom__ {
+    // Espacio reservado para inicializaciones del sistema
 }
 
 - (void)dismissMenu {
@@ -98,12 +104,12 @@ static UIButton *floatingMenuButton = nil;
 #pragma mark - UITableView DataSource
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { 
-    return 4; // Sección 0: Visual Mods | Sección 1: Licencia | Sección 2: Themes | Sección 3: About
+    return 4;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 2; // Nombre Visual, Foto Visual
-    if (section == 1) return 3; // UDID, KEY, EXP
+    if (section == 0) return 2;
+    if (section == 1) return 3;
     if (section == 2) return 1;
     if (section == 3) return 1;
     return 0;
@@ -140,18 +146,23 @@ static UIButton *floatingMenuButton = nil;
     
     cell.accessoryView = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.imageView.image = nil;
     
-    // SECCIÓN 0: OPCIONES VISUALES (REVA STYLE OPTIONS)
+    // SECCIÓN 0: OPCIONES VISUALES
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
             cell.textLabel.text = @"PROFILE NAME";
             cell.detailTextLabel.text = self.currentVisualName;
-            cell.imageView.image = [UIImage systemImageNamed:@"pencil.circle.fill"];
+            if (@available(iOS 13.0, *)) {
+                cell.imageView.image = [UIImage systemImageNamed:@"pencil.circle.fill"];
+            }
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"PROFILE PICTURE";
             cell.detailTextLabel.text = @"Tap to Change Avatar Blend (Visual)";
-            cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
+            if (@available(iOS 13.0, *)) {
+                cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
+            }
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
     }
@@ -160,15 +171,21 @@ static UIButton *floatingMenuButton = nil;
         if (indexPath.row == 0) {
             cell.textLabel.text = @"UDID";
             cell.detailTextLabel.text = @"••••••••-••••••••••••••••";
-            cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
+            if (@available(iOS 13.0, *)) {
+                cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
+            }
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"KEY";
             cell.detailTextLabel.text = @"•••••";
-            cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
+            if (@available(iOS 13.0, *)) {
+                cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
+            }
         } else if (indexPath.row == 2) {
             cell.textLabel.text = @"EXPIRATION";
             cell.detailTextLabel.text = @"27/01/2029";
-            cell.imageView.image = [UIImage systemImageNamed:@"calendar"];
+            if (@available(iOS 13.0, *)) {
+                cell.imageView.image = [UIImage systemImageNamed:@"calendar"];
+            }
             
             UILabel *statusBadge = [[UILabel alloc] init];
             statusBadge.text = @"  Active  ";
@@ -189,12 +206,16 @@ static UIButton *floatingMenuButton = nil;
     else if (indexPath.section == 2) {
         cell.textLabel.text = @"Theme Settings";
         cell.detailTextLabel.text = @"Colors, icons, layout";
-        cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
+        if (@available(iOS 13.0, *)) {
+            cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
+        }
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3) {
         cell.textLabel.text = @"About";
         cell.detailTextLabel.text = @"Developer, version, info";
-        cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
+        if (@available(iOS 13.0, *)) {
+            cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
+        }
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
     return cell;
@@ -205,7 +226,6 @@ static UIButton *floatingMenuButton = nil;
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
-    // Acción cambiar nombre visualmente
     if (indexPath.section == 0 && indexPath.row == 0) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Change Name" 
                                                                        message:@"Enter fake profile name (Visual Only)" 
@@ -229,12 +249,10 @@ static UIButton *floatingMenuButton = nil;
         [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
     }
-    // Acción cambiar foto de perfil alternando presets
     else if (indexPath.section == 0 && indexPath.row == 1) {
         static int avatarIndex = 0;
         avatarIndex++;
         
-        // Simulación visual en caliente alternando colores degradados premium
         CGRect rect = CGRectMake(0, 0, 100, 100);
         UIGraphicsBeginImageContext(rect.size);
         CGContextRef context = UIGraphicsGetCurrentContext();
@@ -261,9 +279,9 @@ static UIButton *floatingMenuButton = nil;
 // CONSTRUCTOR FLOTANTE & ARRASTRABLE (SWIZZLING NATIVO)
 // ============================================================================
 
-// Manejador del arrastre del botón flotante para moverlo por toda la pantalla
 static void handlePanGesture(UIPanGestureRecognizer *sender) {
     UIView *piece = floatingMenuButton;
+    if (!piece) return;
     [piece.superview bringSubviewToFront:piece];
     CGPoint translation = [sender translationInView:piece.superview];
     
@@ -273,7 +291,6 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
     }
 }
 
-// Acción al presionar el botón flotante engranaje
 static void floatingButtonTapped() {
     UIWindow *windowPrincipal = nil;
     if (@available(iOS 13.0, *)) {
@@ -294,8 +311,9 @@ static void floatingButtonTapped() {
         rootVC = rootVC.presentedViewController;
     }
     
-    // Ocultar botón flotante mientras el menú completo esté en pantalla
-    floatingMenuButton.hidden = YES;
+    if (floatingMenuButton) {
+        floatingMenuButton.hidden = YES;
+    }
     
     DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
     UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
@@ -312,7 +330,6 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
     dispatch_once(&onceToken, ^{
         UIViewController *currentVC = (UIViewController *)self;
         
-        // Crear el botón flotante nativo
         floatingMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
         floatingMenuButton.frame = CGRectMake(currentVC.view.frame.size.width - 75, currentVC.view.frame.size.height - 160, 55, 55);
         floatingMenuButton.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:0.9];
@@ -323,24 +340,25 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
         floatingMenuButton.layer.borderWidth = 1.5;
         floatingMenuButton.layer.borderColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.22 alpha:1.0].CGColor;
         
-        // Asignar icono engranaje de configuración premium
-        [floatingMenuButton setImage:[UIImage systemImageNamed:@"gearshape.fill"] forState:UIControlStateNormal];
+        if (@available(iOS 13.0, *)) {
+            [floatingMenuButton setImage:[UIImage systemImageNamed:@"gearshape.fill"] forState:UIControlStateNormal];
+        }
         floatingMenuButton.tintColor = [UIColor whiteColor];
         
-        // Agregar acción de click y gesto táctil para arrastrar por la pantalla
         [floatingMenuButton addTarget:self action:@selector(floatingButtonAction) forControlEvents:UIControlEventTouchUpInside];
         
         UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:currentVC action:@selector(handlePanAction:)];
         [floatingMenuButton addGestureRecognizer:panGesture];
         
-        // Inyectar el botón en la jerarquía superior de la ventana activa
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [[UIApplication sharedApplication].keyWindow addSubview:floatingMenuButton];
+            UIWindow *keyWin = [UIApplication sharedApplication].keyWindow;
+            if (keyWin) {
+                [keyWin addSubview:floatingMenuButton];
+            }
         });
     });
 }
 
-// Métodos puentes dinámicos agregados a la clase interceptada mediante la Runtime de Objective-C
 void dynamic_floatingButtonAction(id self, SEL _cmd) {
     floatingButtonTapped();
 }
@@ -354,7 +372,6 @@ __attribute__((constructor)) static void initInyectorForzado() {
     if (!targetClass) targetClass = NSClassFromString(@"WAMainViewController");
     if (!targetClass) targetClass = [UITabBarController class];
     
-    // Registrar dinámicamente las acciones del botón en el controlador de WhatsApp para evitar crashes
     class_addMethod(targetClass, @selector(floatingButtonAction), (IMP)dynamic_floatingButtonAction, "v@:");
     class_addMethod(targetClass, @selector(handlePanAction:), (IMP)dynamic_handlePanAction, "v@:@");
     
