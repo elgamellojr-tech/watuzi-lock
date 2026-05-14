@@ -3,7 +3,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 
-// --- Instancia Global del Monitor ---
+// --- Instancia Global Única ---
 static UILabel *networkSpeedLabel = nil;
 
 // Variables para el cálculo de bytes
@@ -53,30 +53,26 @@ static void updateNetworkSpeed() {
 }
 
 // ============================================================================
-// INYECCIÓN VISUAL CORREGIDA (MÁS ARRIBA)
+// CREADOR SEGURO DEL MONITOR (EVITA DUPLICADOS)
 // ============================================================================
-static void (*original_viewDidAppear)(id, SEL, BOOL);
-
-void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
-    original_viewDidAppear(self, _cmd, animated);
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIViewController *currentVC = (UIViewController *)self;
+static void verificarYCrearMonitor() {
+    dispatch_async(dispatch_get_main_queue(), ^{
         UIWindow *keyWin = [UIApplication sharedApplication].keyWindow;
+        if (!keyWin) return;
         
-        // Dimensiones del monitor
+        // Si ya existe en la ventana, solo lo traemos al frente por si se ocultó
+        if (networkSpeedLabel && [networkSpeedLabel isDescendantOfView:keyWin]) {
+            [keyWin bringSubviewToFront:networkSpeedLabel];
+            return;
+        }
+        
+        // Si se destruyó al salir de la app, lo creamos de cero con sus medidas exactas
         CGFloat labelWidth = 190;
         CGFloat labelHeight = 26;
-        
-        // Centro horizontal exacto
-        CGFloat screenWidth = currentVC.view.frame.size.width;
+        CGFloat screenWidth = keyWin.frame.size.width;
         CGFloat posX = (screenWidth - labelWidth) / 2.0;
+        CGFloat posY = 44; // Altura premium pegada a la Isla Dinámica
         
-        // Ajustado más arriba (De 54 bajó a 44 para pegarse a la Isla Dinámica)
-        CGFloat posY = 44;
-        
-        // Crear el diseño en negro traslúcido
         networkSpeedLabel = [[UILabel alloc] initWithFrame:CGRectMake(posX, posY, labelWidth, labelHeight)];
         networkSpeedLabel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:0.85];
         networkSpeedLabel.textColor = [UIColor whiteColor];
@@ -88,30 +84,51 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
         networkSpeedLabel.layer.borderColor = [UIColor colorWithWhite:0.2 alpha:1.0].CGColor;
         networkSpeedLabel.text = @" ↑ 0.0 KB/s  ↓ 0.0 KB/s ";
         
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            if (keyWin) {
-                [keyWin addSubview:networkSpeedLabel];
-                [keyWin bringSubviewToFront:networkSpeedLabel];
-                
-                [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
-                    updateNetworkSpeed();
-                }];
-            }
-        });
+        [keyWin addSubview:networkSpeedLabel];
+        [keyWin bringSubviewToFront:networkSpeedLabel];
     });
 }
 
 // ============================================================================
-// CONSTRUCTOR CENTRAL
+// RECEPTOR DE EVENTOS DEL SISTEMA (ENTRAR/SALIR DE LA APP)
 // ============================================================================
-__attribute__((constructor)) static void initInyectorVelocidadTop() {
-    Class targetClass = NSClassFromString(@"WASingleChatListViewController");
-    if (!targetClass) targetClass = NSClassFromString(@"WAHomeViewController");
-    if (!targetClass) targetClass = [UITabBarController class];
-    
-    SEL originalSelector = @selector(viewDidAppear:);
-    Method originalMethod = class_getInstanceMethod(targetClass, originalSelector);
-    
-    original_viewDidAppear = (void *)method_getImplementation(originalMethod);
-    method_setImplementation(originalMethod, (IMP)custom_viewDidAppear);
+@interface DOMIDIOSNetworkObserver : NSObject
+@end
+
+@implementation DOMIDIOSNetworkObserver
++ (void)load {
+    static DOMIDIOSNetworkObserver *sharedObserver = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedObserver = [[DOMIDIOSNetworkObserver alloc] init];
+        
+        // Escucha cuando la app se abre o vuelve a estar activa
+        [[NSNotificationCenter defaultCenter] addObserver:sharedObserver
+                                                 selector:@selector(appFocalizada)
+                                                     name:UIApplicationDidBecomeActiveNotification
+                                                   object:nil];
+        
+        // Inicializa el bucle del medidor de KB/s global de fondo
+        [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+            updateNetworkSpeed();
+        }];
+    });
+}
+
+- (void)appFocalizada {
+    // Forzamos la reconstrucción o reacomodo justo al entrar a WhatsApp
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        verificarYCrearMonitor();
+    });
+}
+@end
+
+// ============================================================================
+// CONSTRUCTOR INICIALIZADOR
+// ============================================================================
+__attribute__((constructor)) static void initInyectorPersistente() {
+    // Arranca el chequeo apenas la dylib carga en memoria
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        verificarYCrearMonitor();
+    });
 }
