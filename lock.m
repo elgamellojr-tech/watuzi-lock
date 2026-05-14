@@ -1,88 +1,85 @@
 #import <UIKit/UIKit.h>
 
-// Declaramos las clases de WhatsApp para que el compilador no de error
-@interface WAChatViewController : UIViewController
+// --- interfaces para evitar warnings/errores de compilación ---
+@interface WAMenuItemCell : UITableViewCell
 @end
 
-@interface ProfileViewController : UIViewController
-@property (nonatomic, strong) UIView *containerView;
+@interface DOMIDIOSProfileViewController : UIViewController <UITableViewDelegate, UITableViewDataSource>
+@property (nonatomic, strong) UITableView *tableView;
+@property (nonatomic, strong) UIImageView *headerBannerView;
+@property (nonatomic, strong) UIImageView *avatarImageView;
+@property (nonatomic, strong) UILabel *nameLabel;
+@property (nonatomic, strong) UIView *onlineStatusDot;
 @end
 
-// --- LÓGICA DE LA INTERFAZ DEL PERFIL ---
-@implementation ProfileViewController
+@implementation DOMIDIOSProfileViewController
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
     
-    // Contenedor principal (estilo image_2.png)
-    self.containerView = [[UIView alloc] initWithFrame:CGRectMake(20, 100, self.view.frame.size.width - 40, 520)];
-    self.containerView.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:1.0];
-    self.containerView.layer.cornerRadius = 25;
-    self.containerView.clipsToBounds = YES;
-    [self.view addSubview:self.containerView];
+    self.title = @"Profile";
+    self.view.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0]; // Fondo oscuro Premium
     
-    // Banner superior
-    UIView *banner = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.containerView.frame.size.width, 130)];
-    banner.backgroundColor = [UIColor colorWithRed:0.6 green:0.0 blue:0.0 alpha:1.0]; // Color base rojo
-    [self.containerView addSubview:banner];
-
-    // Texto de Ejemplo: saint iOS
-    UILabel *userLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 160, 200, 30)];
-    userLabel.text = @"saint iOS";
-    userLabel.textColor = [UIColor whiteColor];
-    userLabel.font = [UIFont boldSystemFontOfSize:24];
-    [self.containerView addSubview:userLabel];
-
-    // Botón para cerrar
-    UIButton *close = [[UIButton alloc] initWithFrame:CGRectMake(15, 15, 30, 30)];
-    [close setTitle:@"✕" forState:UIControlStateNormal];
-    [close setBackgroundColor:[UIColor colorWithWhite:0 alpha:0.3]];
-    close.layer.cornerRadius = 15;
-    [close addTarget:self action:@selector(closeMe) forControlEvents:UIControlEventTouchUpInside];
-    [self.containerView addSubview:close];
-}
-- (void)closeMe { [self dismissViewControllerAnimated:YES completion:nil]; }
-@end
-
-
-// --- HOOKS PARA TRANSPARENCIA (image_3.png) ---
-%hook TLKTableView
-- (void)layoutSubviews {
-    %orig;
-    self.backgroundColor = [UIColor clearColor];
-    self.backgroundView = nil;
-}
-%end
-
-%hook WAConversationCell
-- (void)layoutSubviews {
-    %orig;
-    // Esto quita el fondo blanco/gris de cada chat en la lista
-    self.backgroundColor = [UIColor clearColor];
-    self.contentView.backgroundColor = [UIColor clearColor];
+    // Configurar la Tabla
+    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
+    self.tableView.delegate = self;
+    self.tableView.dataSource = self;
+    self.tableView.backgroundColor = [UIColor clearColor];
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone; // Estilo limpio sin líneas feas
+    self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view addSubview:self.tableView];
     
-    // Si quieres que se vea un poco oscuro como en image_3.png:
-    UIView *bg = [[UIView alloc] initWithFrame:self.bounds];
-    bg.backgroundColor = [UIColor colorWithWhite:0 alpha:0.2];
-    self.backgroundView = bg;
-}
-%end
-
-// --- BOTÓN EN EL CHAT PARA ABRIR PERFIL ---
-%hook WAChatViewController
-- (void)viewDidLoad {
-    %orig;
-    UIBarButtonItem *profileItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"person.crop.circle"] 
-                                                                    style:UIBarButtonItemStylePlain 
-                                                                   target:self 
-                                                                   action:@selector(openProfileManual)];
-    self.navigationItem.rightBarButtonItems = @[profileItem];
+    [self setupHeaderView];
 }
 
-%new
-- (void)openProfileManual {
-    ProfileViewController *pvc = [[ProfileViewController alloc] init];
-    pvc.modalPresentationStyle = UIModalPresentationOverFullScreen;
-    [self presentViewController:pvc animated:YES completion:nil];
+// --- CONFIGURACIÓN DEL CABEZAL (BANNER Y AVATAR) ---
+- (void)setupHeaderView {
+    UIView *headerContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 220)];
+    headerContainer.backgroundColor = [UIColor clearColor];
+    
+    // Banner Rojo/Negro de fondo
+    self.headerBannerView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, headerContainer.frame.size.width, 140)];
+    self.headerBannerView.contentMode = UIViewContentModeScaleAspectFill;
+    self.headerBannerView.clipsToBounds = YES;
+    self.headerBannerView.image = [UIImage imageNamed:@"domidios_banner"]; // Asegúrate de tenerlo en tus Assets
+    self.headerBannerView.backgroundColor = [UIColor blackColor];
+    [headerContainer addSubview:self.headerBannerView];
+    
+    // Contenedor del Avatar (Círculo)
+    self.avatarImageView = [[UIImageView alloc] initWithFrame:CGRectMake(20, 100, 80, 80)];
+    self.avatarImageView.layer.cornerRadius = 40;
+    self.avatarImageView.layer.borderWidth = 3.0;
+    self.avatarImageView.layer.borderColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0].CGColor;
+    self.avatarImageView.clipsToBounds = YES;
+    self.avatarImageView.image = [UIImage imageNamed:@"domidios_avatar"];
+    [headerContainer addSubview:self.avatarImageView];
+    
+    // Indicador En Línea (Punto Verde)
+    self.onlineStatusDot = [[UIView alloc] initWithFrame:CGRectMake(82, 162, 14, 14)];
+    self.onlineStatusDot.backgroundColor = [UIColor colorWithRed:0.20 green:0.78 blue:0.35 alpha:1.0];
+    self.onlineStatusDot.layer.cornerRadius = 7;
+    self.onlineStatusDot.layer.borderWidth = 2.0;
+    self.onlineStatusDot.layer.borderColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0].CGColor;
+    [headerContainer addSubview:self.onlineStatusDot];
+    
+    // Etiqueta del Nombre (saint iOS)
+    self.nameLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 185, headerContainer.frame.size.width - 40, 30)];
+    self.nameLabel.text = @"saint iOS";
+    self.nameLabel.textColor = [UIColor whiteColor];
+    self.nameLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
+    [headerContainer addSubview:self.nameLabel];
+    
+    self.tableView.tableHeaderView = headerContainer;
 }
-%end
+
+#pragma mark - UITableView DataSource
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 3; // Sección 1: Licencia (UDID/Key/Exp) | Sección 2: Themes | Sección 3: About
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (section == 0) return 3; // UDID, KEY, EXPIRATION
+    if (section == 1) return 1; // Theme Settings
+    if (section == 2) return 1; // About
+    return 0
