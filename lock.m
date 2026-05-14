@@ -240,7 +240,6 @@ static UIButton *floatingMenuButton = nil;
         static int colorIndex = 0;
         colorIndex++;
         
-        // Alternar colores puros de UIKit directamente para no requerir CoreGraphics en Clang
         UIColor *newColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
         if (colorIndex % 3 == 1) {
             newColor = [UIColor systemRedColor];
@@ -268,98 +267,7 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
     
     if ([sender state] == UIGestureRecognizerStateChanged) {
         piece.center = CGPointMake(piece.center.x + translation.x, piece.center.y + translation.y);
-        // Reseteo nativo manual equivalente a CGPointZero sin usar la macro del linker
-        [sender setTranslation:CGPointTranslate(CGPointZero, 0, 0) inView:piece.superview];
-    }
-}
-
-static void floatingButtonTapped() {
-    UIWindow *windowPrincipal = nil;
-    if (@available(iOS 13.0, *)) {
-        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive) {
-                for (UIWindow *window in scene.windows) {
-                    if (window.isKeyWindow) { windowPrincipal = window; break; }
-                }
-            }
-        }
-    }
-    if (!windowPrincipal) {
-        windowPrincipal = [UIApplication sharedApplication].keyWindow;
-    }
-    
-    UIViewController *rootVC = windowPrincipal.rootViewController;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
-    }
-    
-    if (floatingMenuButton) {
-        floatingMenuButton.hidden = YES;
-    }
-    
-    DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
-    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
-    navController.modalPresentationStyle = UIModalPresentationFullScreen;
-    [rootVC presentViewController:navController animated:YES completion:nil];
-}
-
-static void (*original_viewDidAppear)(id, SEL, BOOL);
-
-void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
-    original_viewDidAppear(self, _cmd, animated);
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIViewController *currentVC = (UIViewController *)self;
         
-        floatingMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        floatingMenuButton.frame = CGRectMake(currentVC.view.frame.size.width - 75, currentVC.view.frame.size.height - 160, 55, 55);
-        floatingMenuButton.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:0.9];
-        floatingMenuButton.layer.cornerRadius = 27.5;
-        floatingMenuButton.layer.shadowColor = [UIColor blackColor].CGColor;
-        floatingMenuButton.layer.shadowOpacity = 0.5;
-        floatingMenuButton.layer.shadowOffset = CGSizeMake(0, 3);
-        floatingMenuButton.layer.borderWidth = 1.5;
-        floatingMenuButton.layer.borderColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.22 alpha:1.0].CGColor;
-        
-        if (@available(iOS 13.0, *)) {
-            [floatingMenuButton setImage:[UIImage systemImageNamed:@"gearshape.fill"] forState:UIControlStateNormal];
-        }
-        floatingMenuButton.tintColor = [UIColor whiteColor];
-        
-        [floatingMenuButton addTarget:self action:@selector(floatingButtonAction) forControlEvents:UIControlEventTouchUpInside];
-        
-        UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:currentVC action:@selector(handlePanAction:)];
-        [floatingMenuButton addGestureRecognizer:panGesture];
-        
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            UIWindow *keyWin = [UIApplication sharedApplication].keyWindow;
-            if (keyWin) {
-                [keyWin addSubview:floatingMenuButton];
-            }
-        });
-    });
-}
-
-void dynamic_floatingButtonAction(id self, SEL _cmd) {
-    floatingButtonTapped();
-}
-
-void dynamic_handlePanAction(id self, SEL _cmd, UIPanGestureRecognizer *sender) {
-    handlePanGesture(sender);
-}
-
-__attribute__((constructor)) static void initInyectorForzado() {
-    Class targetClass = NSClassFromString(@"WAVisualEffectsController");
-    if (!targetClass) targetClass = NSClassFromString(@"WAMainViewController");
-    if (!targetClass) targetClass = [UITabBarController class];
-    
-    class_addMethod(targetClass, @selector(floatingButtonAction), (IMP)dynamic_floatingButtonAction, "v@:");
-    class_addMethod(targetClass, @selector(handlePanAction:), (IMP)dynamic_handlePanAction, "v@:@");
-    
-    SEL originalSelector = @selector(viewDidAppear:);
-    Method originalMethod = class_getInstanceMethod(targetClass, originalSelector);
-    
-    original_viewDidAppear = (void *)method_getImplementation(originalMethod);
-    method_setImplementation(originalMethod, (IMP)custom_viewDidAppear);
-}
+        // Corrección del error: Estructura limpia e inicializada a cero directamente para el compilador
+        CGPoint zeroPoint;
+        zeroPoint.x = 0;
