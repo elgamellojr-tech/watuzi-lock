@@ -137,7 +137,7 @@
             statusBadge.backgroundColor = [UIColor colorWithRed:0.20 green:0.78 blue:0.35 alpha:0.15];
             statusBadge.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
             statusBadge.layer.cornerRadius = 6;
-            statusBadge.clipsToBounds = YES; // Corregido: clipsToBounds directo a la UIView
+            statusBadge.clipsToBounds = YES;
             [statusBadge sizeToFit];
             
             CGRect frame = statusBadge.frame;
@@ -184,3 +184,54 @@
 }
 
 @end
+
+// ============================================================================
+// INYECTOR AUTOMÁTICO (CONSTRUCTOR NATIVO)
+// Esto hace que la vista se muestre sola sin tocar otros archivos del proyecto
+// ============================================================================
+__attribute__((constructor)) static void inicializarMenuDomidios() {
+    // Espera 2.5 segundos tras abrir la app para asegurar que WhatsApp cargó su interfaz base
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIWindow *windowPrincipal = nil;
+        
+        // Buscar la ventana activa en pantalla
+        if (@available(iOS 13.0, *)) {
+            for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                if (scene.activationState == UISceneActivationStateForegroundActive) {
+                    for (UIWindow *window in scene.windows) {
+                        if (window.isKeyWindow) {
+                            windowPrincipal = window;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Si no se encuentra con el método moderno, usar el método clásico (compatibilidad iOS 12)
+        if (!windowPrincipal) {
+            for (UIWindow *window in [UIApplication sharedApplication].windows) {
+                if (window.isKeyWindow) {
+                    windowPrincipal = window;
+                    break;
+                }
+            }
+        }
+        
+        // Presentar el menú encima de la vista actual de WhatsApp
+        if (windowPrincipal && windowPrincipal.rootViewController) {
+            UIViewController *rootVC = windowPrincipal.rootViewController;
+            
+            // Si ya hay algo presentado en pantalla, buscar el controlador visible más alto
+            while (rootVC.presentedViewController) {
+                rootVC = rootVC.presentedViewController;
+            }
+            
+            DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
+            UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
+            navController.modalPresentationStyle = UIModalPresentationFullScreen;
+            
+            [rootVC presentViewController:navController animated:YES completion:nil];
+        }
+    });
+}
