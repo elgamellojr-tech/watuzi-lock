@@ -35,7 +35,10 @@ void hook_ForceHideAdView(id self, SEL _cmd) {
     UIView *view = (UIView *)self;
     view.hidden = YES;
     view.alpha = 0.0;
-    [view initWithFrame:CGRectZero];
+    
+    // CAMBIO CLAVE: Usamos CGRectMake directo para evitar la dependencia de CoreGraphics externa
+    [view setFrame:CGRectMake(0, 0, 0, 0)];
+    
     for (UIView *subview in view.subviews) {
         [subview removeFromSuperview];
     }
