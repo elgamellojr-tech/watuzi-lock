@@ -1,13 +1,19 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// --- interfaces para evitar warnings/errores de compilación ---
+// --- Instancia global del botón flotante ---
+static UIButton *floatingMenuButton = nil;
+
 @interface DOMIDIOSProfileViewController : UIViewController <UITableViewDelegate, UITableViewDataSource>
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIImageView *headerBannerView;
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UIView *onlineStatusDot;
+
+// Variables persistentes para el cambio visual en caliente
+@property (nonatomic, strong) NSString *currentVisualName;
+@property (nonatomic, strong) UIImage *currentVisualAvatar;
 @end
 
 @implementation DOMIDIOSProfileViewController
@@ -15,8 +21,19 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    self.title = @"Profile";
+    // Inicializar valores por defecto si están vacíos
+    if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
+    
+    self.title = @"DOMIDIOS MENU";
     self.view.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0];
+    
+    // Botón nativo superior para cerrar el menú y regresar a WhatsApp
+    UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithTitle:@"Minimize" 
+                                                                    style:UIBarButtonItemStyleDone 
+                                                                   target:self 
+                                                                   action:@selector(dismissMenu)];
+    closeButton.tintColor = [UIColor redColor];
+    self.navigationItem.rightBarButtonItem = closeButton;
     
     // Configurar la Tabla
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
@@ -28,6 +45,15 @@
     [self.view addSubview:self.tableView];
     
     [self setupHeaderView];
+}
+
+- (void)dismissMenu {
+    [self dismissViewControllerAnimated:YES completion:^{
+        // Volver a mostrar el botón flotante al cerrar la interfaz completa
+        if (floatingMenuButton) {
+            floatingMenuButton.hidden = NO;
+        }
+    }];
 }
 
 - (void)setupHeaderView {
@@ -45,6 +71,12 @@
     self.avatarImageView.layer.borderWidth = 3.0;
     self.avatarImageView.layer.borderColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.07 alpha:1.0].CGColor;
     self.avatarImageView.clipsToBounds = YES;
+    
+    if (self.currentVisualAvatar) {
+        self.avatarImageView.image = self.currentVisualAvatar;
+    } else {
+        self.avatarImageView.backgroundColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
+    }
     [headerContainer addSubview:self.avatarImageView];
     
     self.onlineStatusDot = [[UIView alloc] initWithFrame:CGRectMake(82, 162, 14, 14)];
@@ -55,7 +87,7 @@
     [headerContainer addSubview:self.onlineStatusDot];
     
     self.nameLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 185, headerContainer.frame.size.width - 40, 30)];
-    self.nameLabel.text = @"saint iOS";
+    self.nameLabel.text = self.currentVisualName;
     self.nameLabel.textColor = [UIColor whiteColor];
     self.nameLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
     [headerContainer addSubview:self.nameLabel];
@@ -65,12 +97,30 @@
 
 #pragma mark - UITableView DataSource
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { 
+    return 4; // Sección 0: Visual Mods | Sección 1: Licencia | Sección 2: Themes | Sección 3: About
+}
+
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 3;
-    if (section == 1) return 1;
+    if (section == 0) return 2; // Nombre Visual, Foto Visual
+    if (section == 1) return 3; // UDID, KEY, EXP
     if (section == 2) return 1;
+    if (section == 3) return 1;
     return 0;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    if (section == 0) return @"VISUAL MODIFICATIONS (ONLY)";
+    if (section == 1) return @"LICENSE INFOMATION";
+    return nil;
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view forSection:(NSInteger)section {
+    if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
+        UITableViewHeaderFooterView *header = (UITableViewHeaderFooterView *)view;
+        header.textLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
+        header.textLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
+    }
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -91,27 +141,30 @@
     cell.accessoryView = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;
     
+    // SECCIÓN 0: OPCIONES VISUALES (REVA STYLE OPTIONS)
     if (indexPath.section == 0) {
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"PROFILE NAME";
+            cell.detailTextLabel.text = self.currentVisualName;
+            cell.imageView.image = [UIImage systemImageNamed:@"pencil.circle.fill"];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = @"PROFILE PICTURE";
+            cell.detailTextLabel.text = @"Tap to Change Avatar Blend (Visual)";
+            cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        }
+    }
+    // SECCIÓN 1: LICENCIA
+    else if (indexPath.section == 1) {
         if (indexPath.row == 0) {
             cell.textLabel.text = @"UDID";
             cell.detailTextLabel.text = @"••••••••-••••••••••••••••";
             cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
-            
-            UIButton *revealBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            [revealBtn setImage:[UIImage systemImageNamed:@"eye.slash"] forState:UIControlStateNormal];
-            revealBtn.frame = CGRectMake(0, 0, 25, 25);
-            revealBtn.tintColor = [UIColor grayColor];
-            cell.accessoryView = revealBtn;
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"KEY";
             cell.detailTextLabel.text = @"•••••";
             cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
-            
-            UIButton *revealBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            [revealBtn setImage:[UIImage systemImageNamed:@"eye.slash"] forState:UIControlStateNormal];
-            revealBtn.frame = CGRectMake(0, 0, 25, 25);
-            revealBtn.tintColor = [UIColor grayColor];
-            cell.accessoryView = revealBtn;
         } else if (indexPath.row == 2) {
             cell.textLabel.text = @"EXPIRATION";
             cell.detailTextLabel.text = @"27/01/2029";
@@ -131,16 +184,16 @@
             statusBadge.frame = frame;
             cell.accessoryView = statusBadge;
         }
-    } else if (indexPath.section == 1) {
+    } 
+    // SECCIONES FINALES
+    else if (indexPath.section == 2) {
         cell.textLabel.text = @"Theme Settings";
         cell.detailTextLabel.text = @"Colors, icons, layout";
-        cell.detailTextLabel.textColor = [UIColor lightGrayColor];
         cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    } else if (indexPath.section == 2) {
+    } else if (indexPath.section == 3) {
         cell.textLabel.text = @"About";
         cell.detailTextLabel.text = @"Developer, version, info";
-        cell.detailTextLabel.textColor = [UIColor lightGrayColor];
         cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
@@ -148,53 +201,166 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 60.0; }
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 10.0; }
-- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section { return 0.1; }
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath { [tableView deselectRowAtIndexPath:indexPath animated:YES]; }
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+    // Acción cambiar nombre visualmente
+    if (indexPath.section == 0 && indexPath.row == 0) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Change Name" 
+                                                                       message:@"Enter fake profile name (Visual Only)" 
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        
+        [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+            textField.text = self.currentVisualName;
+            textField.placeholder = @"e.g. DOMIDIOS VIP";
+        }];
+        
+        UIAlertAction *confirm = [UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            UITextField *input = alert.textFields.firstObject;
+            if (input.text.length > 0) {
+                self.currentVisualName = input.text;
+                self.nameLabel.text = input.text;
+                [self.tableView reloadData];
+            }
+        }];
+        
+        [alert addAction:confirm];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+    }
+    // Acción cambiar foto de perfil alternando presets
+    else if (indexPath.section == 0 && indexPath.row == 1) {
+        static int avatarIndex = 0;
+        avatarIndex++;
+        
+        // Simulación visual en caliente alternando colores degradados premium
+        CGRect rect = CGRectMake(0, 0, 100, 100);
+        UIGraphicsBeginImageContext(rect.size);
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        
+        if (avatarIndex % 2 == 0) {
+            CGContextSetFillColorWithColor(context, [UIColor systemRedColor].CGColor);
+        } else {
+            CGContextSetFillColorWithColor(context, [UIColor systemPurpleColor].CGColor);
+        }
+        
+        CGContextFillRect(context, rect);
+        UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        
+        self.currentVisualAvatar = newImage;
+        self.avatarImageView.image = newImage;
+        [self.tableView reloadData];
+    }
+}
 @end
 
 
 // ============================================================================
-// SWIZZLING DIRECTO (HOOK AUTOMÁTICO DESDE OBJC RUNTIME)
+// CONSTRUCTOR FLOTANTE & ARRASTRABLE (SWIZZLING NATIVO)
 // ============================================================================
+
+// Manejador del arrastre del botón flotante para moverlo por toda la pantalla
+static void handlePanGesture(UIPanGestureRecognizer *sender) {
+    UIView *piece = floatingMenuButton;
+    [piece.superview bringSubviewToFront:piece];
+    CGPoint translation = [sender translationInView:piece.superview];
+    
+    if ([sender state] == UIGestureRecognizerStateChanged) {
+        piece.center = CGPointMake(piece.center.x + translation.x, piece.center.y + translation.y);
+        [sender setTranslation:CGPointZero inView:piece.superview];
+    }
+}
+
+// Acción al presionar el botón flotante engranaje
+static void floatingButtonTapped() {
+    UIWindow *windowPrincipal = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                for (UIWindow *window in scene.windows) {
+                    if (window.isKeyWindow) { windowPrincipal = window; break; }
+                }
+            }
+        }
+    }
+    if (!windowPrincipal) {
+        windowPrincipal = [UIApplication sharedApplication].keyWindow;
+    }
+    
+    UIViewController *rootVC = windowPrincipal.rootViewController;
+    while (rootVC.presentedViewController) {
+        rootVC = rootVC.presentedViewController;
+    }
+    
+    // Ocultar botón flotante mientras el menú completo esté en pantalla
+    floatingMenuButton.hidden = YES;
+    
+    DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
+    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
+    navController.modalPresentationStyle = UIModalPresentationFullScreen;
+    [rootVC presentViewController:navController animated:YES completion:nil];
+}
 
 static void (*original_viewDidAppear)(id, SEL, BOOL);
 
 void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
-    // 1. Ejecuta el viewDidAppear original de WhatsApp
     original_viewDidAppear(self, _cmd, animated);
     
-    // 2. Ejecutar nuestra inyección en hilos seguros solo una vez para que no se duplique infinitamente
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         UIViewController *currentVC = (UIViewController *)self;
         
-        // Creamos tu interfaz DOMIDIOS
-        DOMIDIOSProfileViewController *profileVC = [[DOMIDIOSProfileViewController alloc] init];
-        UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:profileVC];
-        navController.modalPresentationStyle = UIModalPresentationFullScreen;
+        // Crear el botón flotante nativo
+        floatingMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        floatingMenuButton.frame = CGRectMake(currentVC.view.frame.size.width - 75, currentVC.view.frame.size.height - 160, 55, 55);
+        floatingMenuButton.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:0.9];
+        floatingMenuButton.layer.cornerRadius = 27.5;
+        floatingMenuButton.layer.shadowColor = [UIColor blackColor].CGColor;
+        floatingMenuButton.layer.shadowOpacity = 0.5;
+        floatingMenuButton.layer.shadowOffset = CGSizeMake(0, 3);
+        floatingMenuButton.layer.borderWidth = 1.5;
+        floatingMenuButton.layer.borderColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.22 alpha:1.0].CGColor;
         
-        // La forzamos a aparecer inmediatamente sobre la primera pantalla que cargue la app
-        [currentVC presentViewController:navController animated:YES completion:nil];
+        // Asignar icono engranaje de configuración premium
+        [floatingMenuButton setImage:[UIImage systemImageNamed:@"gearshape.fill"] forState:UIControlStateNormal];
+        floatingMenuButton.tintColor = [UIColor whiteColor];
+        
+        // Agregar acción de click y gesto táctil para arrastrar por la pantalla
+        [floatingMenuButton addTarget:self action:@selector(floatingButtonAction) forControlEvents:UIControlEventTouchUpInside];
+        
+        UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:currentVC action:@selector(handlePanAction:)];
+        [floatingMenuButton addGestureRecognizer:panGesture];
+        
+        // Inyectar el botón en la jerarquía superior de la ventana activa
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [[UIApplication sharedApplication].keyWindow addSubview:floatingMenuButton];
+        });
     });
 }
 
+// Métodos puentes dinámicos agregados a la clase interceptada mediante la Runtime de Objective-C
+void dynamic_floatingButtonAction(id self, SEL _cmd) {
+    floatingButtonTapped();
+}
+
+void dynamic_handlePanAction(id self, SEL _cmd, UIPanGestureRecognizer *sender) {
+    handlePanGesture(sender);
+}
+
 __attribute__((constructor)) static void initInyectorForzado() {
-    // Interceptamos la clase base de las pantallas de carga de WhatsApp
     Class targetClass = NSClassFromString(@"WAVisualEffectsController");
-    if (!targetClass) {
-        targetClass = NSClassFromString(@"WAMainViewController");
-    }
+    if (!targetClass) targetClass = NSClassFromString(@"WAMainViewController");
+    if (!targetClass) targetClass = [UITabBarController class];
     
-    // Si la app usa estructuras distintas, agarramos la pantalla base universal de iOS (UITabBarController)
-    if (!targetClass) {
-        targetClass = [UITabBarController class];
-    }
+    // Registrar dinámicamente las acciones del botón en el controlador de WhatsApp para evitar crashes
+    class_addMethod(targetClass, @selector(floatingButtonAction), (IMP)dynamic_floatingButtonAction, "v@:");
+    class_addMethod(targetClass, @selector(handlePanAction:), (IMP)dynamic_handlePanAction, "v@:@");
     
     SEL originalSelector = @selector(viewDidAppear:);
     Method originalMethod = class_getInstanceMethod(targetClass, originalSelector);
     
-    // Reemplazamos el método nativo por el nuestro
     original_viewDidAppear = (void *)method_getImplementation(originalMethod);
     method_setImplementation(originalMethod, (IMP)custom_viewDidAppear);
 }
