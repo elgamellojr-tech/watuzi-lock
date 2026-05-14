@@ -1,74 +1,106 @@
 #import <UIKit/UIKit.h>
-#import <objc/runtime.h>
 
-@interface GlobalRedText : NSObject
+@interface ProfileViewController : UIViewController
+@property (nonatomic, strong) UIView *containerView;
 @end
 
-@implementation GlobalRedText
+@implementation ProfileViewController
 
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        // --- 1. HOOK GLOBAL PARA TODOS LOS UILABEL ---
-        Class labelClass = [UILabel class];
-        SEL setTextColorSel = @selector(setTextColor:);
-        Method origMethod = class_getInstanceMethod(labelClass, setTextColorSel);
-        void (*origImp)(id, SEL, UIColor *) = (void *)method_getImplementation(origMethod);
-        
-        id redTextBlock = ^(id self, UIColor *color) {
-            // Forzamos rojo puro en cada etiqueta de la app
-            origImp(self, setTextColorSel, [UIColor redColor]);
-        };
-        method_setImplementation(origMethod, imp_implementationWithBlock(redTextBlock));
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
+    
+    // Crear el contenedor principal estilo tarjeta (como en image_2.png)
+    self.containerView = [[UIView alloc] initWithFrame:CGRectMake(20, 100, self.view.frame.size.width - 40, 500)];
+    self.containerView.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.14 alpha:1.0];
+    self.containerView.layer.cornerRadius = 20;
+    self.containerView.clipsToBounds = YES;
+    [self.view addSubview:self.containerView];
+    
+    // Header con imagen (Banner rojo de image_2.png)
+    UIImageView *banner = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, self.containerView.frame.size.width, 120)];
+    banner.backgroundColor = [UIColor darkGrayColor]; 
+    banner.contentMode = UIViewContentModeScaleAspectFill;
+    // banner.image = [UIImage imageNamed:@"tu_banner_rojo"]; 
+    [self.containerView addSubview:banner];
 
-        // --- 2. HOOK PARA TEXTO ATRIBUIDO (Mensajes con formato) ---
-        // Algunos chats usan texto con formato (negritas, enlaces), esto los captura
-        SEL setAttributedTextSel = @selector(setAttributedText:);
-        Method origAttrMethod = class_getInstanceMethod(labelClass, setAttributedTextSel);
-        void (*origAttrImp)(id, SEL, NSAttributedString *) = (void *)method_getImplementation(origAttrMethod);
+    // Foto de perfil circular
+    UIImageView *profilePic = [[UIImageView alloc] initWithFrame:CGRectMake(20, 90, 60, 60)];
+    profilePic.layer.cornerRadius = 30;
+    profilePic.layer.borderWidth = 3;
+    profilePic.layer.borderColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.14 alpha:1.0].CGColor;
+    profilePic.backgroundColor = [UIColor grayColor];
+    profilePic.clipsToBounds = YES;
+    [self.containerView addSubview:profilePic];
 
-        id redAttrTextBlock = ^(id self, NSAttributedString *attrStr) {
-            if (attrStr) {
-                NSMutableAttributedString *mStr = [attrStr mutableCopy];
-                [mStr addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0, mStr.length)];
-                origAttrImp(self, setAttributedTextSel, mStr);
-            } else {
-                origAttrImp(self, setAttributedTextSel, attrStr);
-            }
-        };
-        method_setImplementation(origAttrMethod, imp_implementationWithBlock(redAttrTextBlock));
+    // Nombre de usuario: saint iOS
+    UILabel *nameLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 155, 200, 30)];
+    nameLabel.text = @"saint iOS ✎";
+    nameLabel.textColor = [UIColor whiteColor];
+    nameLabel.font = [UIFont boldSystemFontOfSize:22];
+    [self.containerView addSubview:nameLabel];
 
-        // --- 3. HOOK DE TINTE GLOBAL (Iconos y Botones) ---
-        Class windowClass = [UIWindow class];
-        SEL setTintSel = @selector(setTintColor:);
-        Method origTintMethod = class_getInstanceMethod(windowClass, setTintSel);
-        void (*origTintImp)(id, SEL, UIColor *) = (void *)method_getImplementation(origTintMethod);
+    // --- SECCIÓN DE DATOS (UDID, KEY, EXPIRATION) ---
+    
+    [self addInfoRowWithIcon:@"🖥" title:@"UDID" value:@"••••••••-••••••••••••••••" yOffset:200];
+    [self addInfoRowWithIcon:@"🔒" title:@"KEY" value:@"ABC-123-XYZ" yOffset:260];
+    [self addInfoRowWithIcon:@"📅" title:@"EXPIRATION" value:@"27/01/2029" yOffset:320];
 
-        id redTintBlock = ^(id self, UIColor *color) {
-            origTintImp(self, setTintSel, [UIColor redColor]);
-        };
-        method_setImplementation(origTintMethod, imp_implementationWithBlock(redTintBlock));
-        
-        // --- 4. PREVENIR QUE WHATSAPP SOBREESCRIBA EL COLOR EN CHATS ---
-        // Hookeamos la celda de mensaje para asegurar el color rojo al final del renderizado
-        Class cellClass = NSClassFromString(@"WAMessageChatTableViewCell");
-        SEL layoutSel = @selector(layoutSubviews);
-        Method origCellMethod = class_getInstanceMethod(cellClass, layoutSel);
-        void (*origCellImp)(id, SEL) = (void *)method_getImplementation(origCellMethod);
-
-        id cellBlock = ^(id self) {
-            origCellImp(self, layoutSel);
-            UIView *view = (UIView *)self;
-            // Buscamos todas las etiquetas dentro de la burbuja y las pintamos de rojo
-            for (UILabel *lbl in [view valueForKeyPath:@"subviews"]) {
-                if ([lbl isKindOfClass:[UILabel class]]) {
-                    lbl.textColor = [UIColor redColor];
-                }
-            }
-        };
-        method_setImplementation(origCellMethod, imp_implementationWithBlock(cellBlock));
-    });
+    // Botón de Cerrar
+    UIButton *closeBtn = [[UIButton alloc] initWithFrame:CGRectMake(15, 15, 35, 35)];
+    [closeBtn setTitle:@"<" forState:UIControlStateNormal];
+    [closeBtn setBackgroundColor:[[UIColor blackColor] colorWithAlphaComponent:0.5]];
+    closeBtn.layer.cornerRadius = 17.5;
+    [closeBtn addTarget:self action:@selector(dismissProfile) forControlEvents:UIControlEventTouchUpInside];
+    [self.containerView addSubview:closeBtn];
 }
 
+- (void)addInfoRowWithIcon:(NSString *)icon title:(NSString *)title value:(NSString *)value yOffset:(CGFloat)y {
+    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(20, y, self.containerView.frame.size.width - 40, 50)];
+    
+    UILabel *iconLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 10, 30, 30)];
+    iconLabel.text = icon;
+    [row addSubview:iconLabel];
+    
+    UILabel *tLabel = [[UILabel alloc] initWithFrame:CGRectMake(40, 5, 200, 15)];
+    tLabel.text = title;
+    tLabel.font = [UIFont systemFontOfSize:10];
+    tLabel.textColor = [UIColor lightGrayColor];
+    [row addSubview:tLabel];
+    
+    UILabel *vLabel = [[UILabel alloc] initWithFrame:CGRectMake(40, 20, 250, 20)];
+    vLabel.text = value;
+    vLabel.font = [UIFont systemFontOfSize:14];
+    vLabel.textColor = [UIColor whiteColor];
+    [row addSubview:vLabel];
+    
+    [self.containerView addSubview:row];
+}
+
+- (void)dismissProfile {
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
 @end
+
+// Hook para añadir el botón en la interfaz de WhatsApp (arriba a la derecha)
+%hook WAChatViewController
+
+- (void)viewDidLoad {
+    %orig;
+    
+    UIButton *profileBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    profileBtn.frame = CGRectMake(0, 0, 40, 40);
+    [profileBtn setImage:[UIImage systemImageNamed:@"person.circle.fill"] forState:UIControlStateNormal];
+    [profileBtn addTarget:self action:@selector(openCustomProfile) forControlEvents:UIControlEventTouchUpInside];
+    
+    UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:profileBtn];
+    self.navigationItem.rightBarButtonItems = [self.navigationItem.rightBarButtonItems arrayByAddingObject:item];
+}
+
+%new
+- (void)openCustomProfile {
+    ProfileViewController *vc = [[ProfileViewController alloc] init];
+    vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    [self presentViewController:vc animated:YES completion:nil];
+}
+%end
