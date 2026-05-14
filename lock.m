@@ -11,7 +11,7 @@ static UIButton *floatingMenuButton = nil;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UIView *onlineStatusDot;
 
-// Variables persistentes para el cambio visual en caliente
+// Variables de personalización visual en caliente
 @property (nonatomic, strong) NSString *currentVisualName;
 @property (nonatomic, strong) UIColor *currentVisualAvatarColor;
 @end
@@ -19,6 +19,7 @@ static UIButton *floatingMenuButton = nil;
 @implementation DOMIDIOSProfileViewController
 
 - (void)viewDidLoad {
+    [super NSObject];
     [super viewDidLoad];
     
     if (!self.currentVisualName) self.currentVisualName = @"saint iOS";
@@ -89,9 +90,7 @@ static UIButton *floatingMenuButton = nil;
 
 #pragma mark - UITableView DataSource
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { 
-    return 4;
-}
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 4; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 2;
@@ -138,16 +137,12 @@ static UIButton *floatingMenuButton = nil;
         if (indexPath.row == 0) {
             cell.textLabel.text = @"PROFILE NAME";
             cell.detailTextLabel.text = self.currentVisualName;
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.image = [UIImage systemImageNamed:@"pencil.circle.fill"];
-            }
+            if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"pencil.circle.fill"];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"PROFILE PICTURE";
             cell.detailTextLabel.text = @"Tap to Change Avatar Color (Visual)";
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
-            }
+            if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"person.crop.circle.badge.plus"];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
     }
@@ -155,21 +150,15 @@ static UIButton *floatingMenuButton = nil;
         if (indexPath.row == 0) {
             cell.textLabel.text = @"UDID";
             cell.detailTextLabel.text = @"••••••••-••••••••••••••••";
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
-            }
+            if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"KEY";
             cell.detailTextLabel.text = @"•••••";
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
-            }
+            if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
         } else if (indexPath.row == 2) {
             cell.textLabel.text = @"EXPIRATION";
             cell.detailTextLabel.text = @"27/01/2029";
-            if (@available(iOS 13.0, *)) {
-                cell.imageView.image = [UIImage systemImageNamed:@"calendar"];
-            }
+            if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"calendar"];
             
             UILabel *statusBadge = [[UILabel alloc] init];
             statusBadge.text = @"  Active  ";
@@ -189,16 +178,12 @@ static UIButton *floatingMenuButton = nil;
     else if (indexPath.section == 2) {
         cell.textLabel.text = @"Theme Settings";
         cell.detailTextLabel.text = @"Colors, icons, layout";
-        if (@available(iOS 13.0, *)) {
-            cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
-        }
+        if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3) {
         cell.textLabel.text = @"About";
         cell.detailTextLabel.text = @"Developer, version, info";
-        if (@available(iOS 13.0, *)) {
-            cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
-        }
+        if (@available(iOS 13.0, *)) cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
     return cell;
@@ -210,15 +195,10 @@ static UIButton *floatingMenuButton = nil;
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
     if (indexPath.section == 0 && indexPath.row == 0) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Change Name" 
-                                                                       message:@"Enter fake profile name (Visual Only)" 
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Change Name" message:@"Enter fake profile name" preferredStyle:UIAlertControllerStyleAlert];
         [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
             textField.text = self.currentVisualName;
-            textField.placeholder = @"e.g. DOMIDIOS VIP";
         }];
-        
         UIAlertAction *confirm = [UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             UITextField *input = alert.textFields.firstObject;
             if (input.text.length > 0) {
@@ -227,7 +207,6 @@ static UIButton *floatingMenuButton = nil;
                 [self.tableView reloadData];
             }
         }];
-        
         [alert addAction:confirm];
         [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -235,13 +214,9 @@ static UIButton *floatingMenuButton = nil;
     else if (indexPath.section == 0 && indexPath.row == 1) {
         static int colorIndex = 0;
         colorIndex++;
-        
         UIColor *newColor = [UIColor colorWithRed:0.18 green:0.18 blue:0.20 alpha:1.0];
-        if (colorIndex % 3 == 1) {
-            newColor = [UIColor systemRedColor];
-        } else if (colorIndex % 3 == 2) {
-            newColor = [UIColor systemPurpleColor];
-        }
+        if (colorIndex % 3 == 1) newColor = [UIColor systemRedColor];
+        else if (colorIndex % 3 == 2) newColor = [UIColor systemPurpleColor];
         
         self.currentVisualAvatarColor = newColor;
         self.avatarImageView.backgroundColor = newColor;
@@ -252,7 +227,7 @@ static UIButton *floatingMenuButton = nil;
 
 
 // ============================================================================
-// CONSTRUCTOR FLOTANTE & ARRASTRABLE (SWIZZLING NATIVO)
+// CONSTRUCTOR FLOTANTE & ARRASTRABLE (SWIZZLING EN LISTA DE CHATS)
 // ============================================================================
 
 static void handlePanGesture(UIPanGestureRecognizer *sender) {
@@ -269,9 +244,7 @@ static void handlePanGesture(UIPanGestureRecognizer *sender) {
 }
 
 static void floatingButtonTapped() {
-    // Código ultra-reducido de una sola línea para evitar recortes en GitHub Actions
     UIWindow *windowPrincipal = [UIApplication sharedApplication].keyWindow;
-    
     UIViewController *rootVC = windowPrincipal.rootViewController;
     while (rootVC.presentedViewController) {
         rootVC = rootVC.presentedViewController;
@@ -316,10 +289,11 @@ void custom_viewDidAppear(id self, SEL _cmd, BOOL animated) {
         UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:currentVC action:@selector(handlePanAction:)];
         [floatingMenuButton addGestureRecognizer:panGesture];
         
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             UIWindow *keyWin = [UIApplication sharedApplication].keyWindow;
             if (keyWin) {
                 [keyWin addSubview:floatingMenuButton];
+                [keyWin bringSubviewToFront:floatingMenuButton];
             }
         });
     });
@@ -334,8 +308,10 @@ void dynamic_handlePanAction(id self, SEL _cmd, UIPanGestureRecognizer *sender) 
 }
 
 __attribute__((constructor)) static void initInyectorForzado() {
-    Class targetClass = NSClassFromString(@"WAVisualEffectsController");
-    if (!targetClass) targetClass = NSClassFromString(@"WAMainViewController");
+    // Apuntamos directo a la vista principal de la lista de chats de WhatsApp
+    Class targetClass = NSClassFromString(@"WASingleChatListViewController");
+    if (!targetClass) targetClass = NSClassFromString(@"WAHomeViewController");
+    if (!targetClass) targetClass = NSClassFromString(@"WAChatListViewController");
     if (!targetClass) targetClass = [UITabBarController class];
     
     class_addMethod(targetClass, @selector(floatingButtonAction), (IMP)dynamic_floatingButtonAction, "v@:");
