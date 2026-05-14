@@ -82,7 +82,7 @@
     if (section == 0) return 3;
     if (section == 1) return 1;
     if (section == 2) return 1;
-    return 0; // <-- Aquí faltaba el punto y coma clave
+    return 0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -107,10 +107,10 @@
         if (indexPath.row == 0) {
             cell.textLabel.text = @"UDID";
             cell.detailTextLabel.text = @"••••••••-••••••••••••••••";
-            cell.imageView.image = [UIImage systemImageName:@"ipad.and.iphone"];
+            cell.imageView.image = [UIImage systemImageNamed:@"ipad.and.iphone"];
             
             UIButton *revealBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            [revealBtn setImage:[UIImage systemImageName:@"eye.slash"] forState:UIControlStateNormal];
+            [revealBtn setImage:[UIImage systemImageNamed:@"eye.slash"] forState:UIControlStateNormal];
             revealBtn.frame = CGRectMake(0, 0, 25, 25);
             revealBtn.tintColor = [UIColor grayColor];
             cell.accessoryView = revealBtn;
@@ -118,10 +118,10 @@
         } else if (indexPath.row == 1) {
             cell.textLabel.text = @"KEY";
             cell.detailTextLabel.text = @"•••••";
-            cell.imageView.image = [UIImage systemImageName:@"lock.fill"];
+            cell.imageView.image = [UIImage systemImageNamed:@"lock.fill"];
             
             UIButton *revealBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            [revealBtn setImage:[UIImage systemImageName:@"eye.slash"] forState:UIControlStateNormal];
+            [revealBtn setImage:[UIImage systemImageNamed:@"eye.slash"] forState:UIControlStateNormal];
             revealBtn.frame = CGRectMake(0, 0, 25, 25);
             revealBtn.tintColor = [UIColor grayColor];
             cell.accessoryView = revealBtn;
@@ -129,7 +129,7 @@
         } else if (indexPath.row == 2) {
             cell.textLabel.text = @"EXPIRATION";
             cell.detailTextLabel.text = @"27/01/2029";
-            cell.imageView.image = [UIImage systemImageName:@"calendar"];
+            cell.imageView.image = [UIImage systemImageNamed:@"calendar"];
             
             UILabel *statusBadge = [[UILabel alloc] init];
             statusBadge.text = @"  Active  ";
@@ -137,7 +137,7 @@
             statusBadge.backgroundColor = [UIColor colorWithRed:0.20 green:0.78 blue:0.35 alpha:0.15];
             statusBadge.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
             statusBadge.layer.cornerRadius = 6;
-            statusBadge.layer.clipsToBounds = YES;
+            statusBadge.clipsToBounds = YES; // Corregido: clipsToBounds directo a la UIView
             [statusBadge sizeToFit];
             
             CGRect frame = statusBadge.frame;
@@ -151,14 +151,14 @@
         cell.textLabel.text = @"Theme Settings";
         cell.detailTextLabel.text = @"Colors, icons, layout";
         cell.detailTextLabel.textColor = [UIColor lightGrayColor];
-        cell.imageView.image = [UIImage systemImageName:@"gearshape.fill"];
+        cell.imageView.image = [UIImage systemImageNamed:@"gearshape.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
     else if (indexPath.section == 2) {
         cell.textLabel.text = @"About";
         cell.detailTextLabel.text = @"Developer, version, info";
         cell.detailTextLabel.textColor = [UIColor lightGrayColor];
-        cell.imageView.image = [UIImage systemImageName:@"info.circle.fill"];
+        cell.imageView.image = [UIImage systemImageNamed:@"info.circle.fill"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
     
