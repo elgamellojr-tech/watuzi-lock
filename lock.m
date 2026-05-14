@@ -68,19 +68,19 @@ static void verificarYCrearMonitor() {
         
         // Dimensiones del monitor
         CGFloat labelWidth = 190;
-        CGFloat labelHeight = 24; // Ligeramente más compacto para la barra de estado
+        CGFloat labelHeight = 25; // Altura optimizada para el espacio libre
         CGFloat screenWidth = keyWin.frame.size.width;
         CGFloat posX = (screenWidth - labelWidth) / 2.0;
         
-        // SUBIDO AL MÁXIMO: Posición estratégica en la franja de la barra de estado/isla
-        CGFloat posY = 11; 
+        // CORRECCIÓN PRECISA: Subido de 44 a 28 para esquivar perfectamente el texto de los chats
+        CGFloat posY = 28; 
         
         networkSpeedLabel = [[UILabel alloc] initWithFrame:CGRectMake(posX, posY, labelWidth, labelHeight)];
         networkSpeedLabel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:0.85];
         networkSpeedLabel.textColor = [UIColor whiteColor];
-        networkSpeedLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold]; // Ajuste fino de letra
+        networkSpeedLabel.font = [UIFont systemFontOfSize:11.5 weight:UIFontWeightBold];
         networkSpeedLabel.textAlignment = NSTextAlignmentCenter;
-        networkSpeedLabel.layer.cornerRadius = 12;
+        networkSpeedLabel.layer.cornerRadius = 12.5;
         networkSpeedLabel.clipsToBounds = YES;
         networkSpeedLabel.layer.borderWidth = 1.0;
         networkSpeedLabel.layer.borderColor = [UIColor colorWithWhite:0.2 alpha:1.0].CGColor;
