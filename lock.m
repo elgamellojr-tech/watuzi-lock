@@ -1,7 +1,8 @@
 #import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 
-// --- VISTA PERSONALIZADA ---
+// --- VISTA DE LA BARRA PERSONALIZADA ---
 @interface MyCustomBar : UIView
 @property (nonatomic, strong) UIVisualEffectView *blurView;
 @property (nonatomic, strong) UIView *selectionIndicator;
@@ -43,7 +44,8 @@
 
         if (@available(iOS 14.0, *)) {
             UIAction *ajustes = [UIAction actionWithTitle:@"Ajustes" image:nil identifier:nil handler:^(__kindof UIAction *action) {}];
-            _profileButton.menu = [UIMenu menuWithTitle:@"" children:@[ajustes]];
+            UIAction *privacidad = [UIAction actionWithTitle:@"Privacidad" image:nil identifier:nil handler:^(__kindof UIAction *action) {}];
+            _profileButton.menu = [UIMenu menuWithTitle:@"" children:@[ajustes, privacidad]];
             _profileButton.showsMenuAsPrimaryAction = YES;
         }
         [self addSubview:_profileButton];
@@ -52,7 +54,7 @@
 }
 @end
 
-// --- HOOKING ---
+// --- LÓGICA DE HOOKING ---
 static void (*orig_viewDidLayoutSubviews)(UIViewController *, SEL);
 
 void hooked_viewDidLayoutSubviews(UIViewController *self, SEL _cmd) {
@@ -60,17 +62,16 @@ void hooked_viewDidLayoutSubviews(UIViewController *self, SEL _cmd) {
 
     NSString *className = NSStringFromClass([self class]);
     UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
+    UIView *myBar = [keyWindow viewWithTag:888];
 
     if ([className isEqualToString:@"WATabBarController"]) {
-        UITabBarController *tabController = (UITabBarController *)self;
+        UITabBarController *tabC = (UITabBarController *)self;
         
-        // 1. Ocultar la barra original agresivamente
-        tabController.tabBar.hidden = YES;
-        tabController.tabBar.alpha = 0;
-        tabController.tabBar.frame = CGRectZero; 
+        // Ocultar barra original agresivamente
+        tabC.tabBar.hidden = YES;
+        tabC.tabBar.alpha = 0;
+        tabC.tabBar.frame = CGRectMake(0, keyWindow.frame.size.height, 0, 0);
 
-        // 2. Manejar nuestra barra personalizada
-        UIView *myBar = [keyWindow viewWithTag:888];
         if (!myBar) {
             CGFloat width = 280;
             CGFloat height = 65;
@@ -83,31 +84,28 @@ void hooked_viewDidLayoutSubviews(UIViewController *self, SEL _cmd) {
             myBar.tag = 888;
             [keyWindow addSubview:myBar];
         }
-        
-        // Siempre traer al frente para que no la tape nada
         [keyWindow bringSubviewToFront:myBar];
         myBar.hidden = NO;
     } 
-    // Ocultar si entramos a un chat (identificando la clase del controlador de mensajes)
-    else if ([className containsString:@"WAChat"] || [className containsString:@"Message"]) {
-        UIView *myBar = [keyWindow viewWithTag:888];
+    else if ([className containsString:@"WAChat"] || [className containsString:@"Message"] || [className containsString:@"Camera"]) {
         if (myBar) myBar.hidden = YES;
     }
 }
 
 __attribute__((constructor))
 static void init() {
-    // Usamos viewDidLayoutSubviews para que se ejecute cada vez que la UI se refresque
+    // Hook a WATabBarController
     Class targetClass = objc_getClass("WATabBarController");
     if (targetClass) {
         Method m = class_getInstanceMethod(targetClass, @selector(viewDidLayoutSubviews));
         orig_viewDidLayoutSubviews = (void *)method_getImplementation(m);
         method_setImplementation(m, (IMP)hooked_viewDidLayoutSubviews);
     }
-    
-    // Hook adicional para asegurar que se oculte al entrar a cualquier otra pantalla
+
+    // Hook general a UIViewController para detectar cambios de pantalla
     Class baseClass = [UIViewController class];
     Method m2 = class_getInstanceMethod(baseClass, @selector(viewDidLayoutSubviews));
-    orig_viewDidLayoutSubviews = (void *)method_getImplementation(m2);
-    method_setImplementation(m2, (IMP)hooked_viewDidLayoutSubviews);
+    if (m2) {
+        method_setImplementation(m2, (IMP)hooked_viewDidLayoutSubviews);
+    }
 }
