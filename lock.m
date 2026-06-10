@@ -1,113 +1,88 @@
 #import <UIKit/UIKit.h>
-#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 
-// --- INTERFAZ DE LA BARRA ---
-@interface MyCustomBar : UIView
-@property (nonatomic, assign) UITabBarController *tabBarController;
-@property (nonatomic, strong) UIView *selectionIndicator;
+// --- DECLARACIÓN DE CLASES INTERNAS DE WHATSAPP ---
+@interface WAUserJID : NSObject
+@property (nonatomic, copy, readonly) NSString *user;
 @end
 
-@implementation MyCustomBar
+@interface WAPresenceInfo : NSObject
+@property (nonatomic, readonly) WAUserJID *userJID;
+@property (nonatomic, readonly) unsigned long long presence;
+@end
 
-- (instancetype)initWithFrame:(CGRect)frame controller:(UITabBarController *)controller {
-    self = [super initWithFrame:frame];
-    if (self) {
-        _tabBarController = controller;
-        
-        // Estilo Cápsula
-        self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
-        self.layer.cornerRadius = frame.size.height / 2;
-        self.layer.masksToBounds = YES;
-        self.userInteractionEnabled = YES;
 
-        // Efecto Blur
-        UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
-        blur.frame = self.bounds;
-        blur.userInteractionEnabled = NO;
-        [self addSubview:blur];
+// --- DECLARACIÓN DE LA FUNCIÓN DE SUBSTRATE ---
+// Esto evita que el compilador dé error si no encuentra la librería de Substrate de golpe
+#ifdef __cplusplus
+extern "C" {
+#endif
+    void MSHookMessageEx(Class _class, SEL selector, IMP replacement, IMP *result);
+#ifdef __cplusplus
+}
+#endif
 
-        // Indicador Gris (Selección)
-        _selectionIndicator = [[UIView alloc] initWithFrame:CGRectMake(5, 5, (frame.size.width/2)-10, frame.size.height-10)];
-        _selectionIndicator.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.2];
-        _selectionIndicator.layer.cornerRadius = _selectionIndicator.frame.size.height / 2;
-        [self addSubview:_selectionIndicator];
 
-        // Botón CHATS
-        UIButton *btnChat = [UIButton buttonWithType:UIButtonTypeCustom];
-        btnChat.frame = CGRectMake(0, 0, frame.size.width/2, frame.size.height);
-        [btnChat setTitle:@"Chats" forState:UIControlStateNormal];
-        [btnChat addTarget:self action:@selector(actionChats) forControlEvents:UIControlEventTouchUpInside];
-        [self addSubview:btnChat];
+// --- PUNTERO PARA GUARDAR EL MÉTODO ORIGINAL ---
+static void (*orig_updatePresenceInfo)(id self, SEL _cmd, WAPresenceInfo *presenceInfo);
 
-        // Botón PERFIL (Con Menú)
-        UIButton *btnPerfil = [UIButton buttonWithType:UIButtonTypeCustom];
-        btnPerfil.frame = CGRectMake(frame.size.width/2, 0, frame.size.width/2, frame.size.height);
-        [btnPerfil setTitle:@"Perfil" forState:UIControlStateNormal];
-        
-        if (@available(iOS 14.0, *)) {
-            UIAction *verEstado = [UIAction actionWithTitle:@"Ver Estados" image:nil identifier:nil handler:^(__kindof UIAction *action) {
-                if (self.tabBarController) [self.tabBarController setSelectedIndex:0];
-            }];
-            UIAction *verAjustes = [UIAction actionWithTitle:@"Ajustes" image:nil identifier:nil handler:^(__kindof UIAction *action) {
-                if (self.tabBarController) [self.tabBarController setSelectedIndex:4];
-            }];
-            btnPerfil.menu = [UIMenu menuWithTitle:@"" children:@[verEstado, verAjustes]];
-            btnPerfil.showsMenuAsPrimaryAction = YES; // Abre menú al tocar
+
+// --- NUESTRA FUNCIÓN REEMPLAZO (EL HOOK) ---
+static void replaced_updatePresenceInfo(id self, SEL _cmd, WAPresenceInfo *presenceInfo) {
+    // 1. Ejecutamos el método original obligatoriamente
+    orig_updatePresenceInfo(self, _cmd, presenceInfo);
+
+    // 2. Lógica para detectar el estado "En Línea"
+    if (presenceInfo != nil && presenceInfo.userJID != nil) {
+        NSString *phoneNumber = presenceInfo.userJID.user;
+        unsigned long long status = presenceInfo.presence;
+
+        // status == 1 significa "En Línea"
+        if (status == 1) {
+            
+            // Forzar ejecución en el hilo principal para la interfaz gráfica
+            dispatch_async(dispatch_get_main_queue(), ^{
+                
+                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🚨 ¡CONTACTO EN LÍNEA! 🚨"
+                                                                               message:[NSString stringWithFormat:@"El número +%@ se acaba de conectar.", phoneNumber]
+                                                                        preferredStyle:UIAlertControllerStyleAlert];
+                
+                UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
+                [alert addAction:okAction];
+                
+                // Buscar la pantalla de enfrente para mostrar la alerta sin crasear
+                UIViewController *rootVC = [[[UIApplication sharedApplication] keyWindow] rootViewController];
+                if (rootVC) {
+                    while (rootVC.presentedViewController) {
+                        rootVC = rootVC.presentedViewController;
+                    }
+                    [rootVC presentViewController:alert animated:YES completion:nil];
+                }
+            });
+
+            // Log en la consola del dispositivo
+            NSLog(@"[DOMIDIOS] Usuario online detectado: +%@", phoneNumber);
         }
-        [self addSubview:btnPerfil];
     }
-    return self;
 }
 
-- (void)actionChats {
-    if (self.tabBarController) [self.tabBarController setSelectedIndex:3];
-    [UIView animateWithDuration:0.2 animations:^{
-        self.selectionIndicator.frame = CGRectMake(5, 5, (self.frame.size.width/2)-10, self.frame.size.height-10);
-    }];
-}
 
-// Asegura que los botones reciban el toque siempre
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *view = [super hitTest:point withEvent:event];
-    return (view == self) ? nil : view;
-}
-
-@end
-
-// --- HOOKS ---
-static void (*orig_layout)(UIViewController *, SEL);
-
-void hooked_layout(UIViewController *self, SEL _cmd) {
-    orig_layout(self, _cmd);
-
-    if (![NSStringFromClass([self class]) isEqualToString:@"WATabBarController"]) return;
-
-    UITabBarController *tabC = (UITabBarController *)self;
-    tabC.tabBar.hidden = YES; // Oculta original
-
-    UIWindow *win = self.view.window;
-    if (!win) return;
-
-    MyCustomBar *bar = (MyCustomBar *)[win viewWithTag:888];
-    if (!bar) {
-        bar = [[MyCustomBar alloc] initWithFrame:CGRectMake((win.frame.size.width-280)/2, win.frame.size.height-100, 280, 65) controller:tabC];
-        bar.tag = 888;
-        [win addSubview:bar];
-    }
-
-    // Lógica para que NO estorbe en los chats
-    BOOL isMain = (tabC.presentedViewController == nil && tabC.navigationController.viewControllers.count <= 1);
-    bar.hidden = !isMain;
-    if (isMain) [win bringSubviewToFront:bar];
-}
-
-__attribute__((constructor))
-static void init() {
-    Class c = objc_getClass("WATabBarController");
-    if (c) {
-        Method m = class_getInstanceMethod(c, @selector(viewDidLayoutSubviews));
-        orig_layout = (void *)method_getImplementation(m);
-        method_setImplementation(m, (IMP)hooked_layout);
+// --- CONSTRUCTOR: SE EJECUTA AL CARGAR EL DYLIB EN LA IPA ---
+__attribute__((constructor)) static void initialize_hooks() {
+    // Buscamos la clase dentro de WhatsApp
+    Class targetClass = objc_getClass("WAPresenceManager");
+    
+    if (targetClass) {
+        SEL targetSelector = sel_registerName("updatePresenceInfo:");
+        
+        // Aplicamos el Hook usando la API nativa de Substrate
+        MSHookMessageEx(targetClass, 
+                        targetSelector, 
+                        (IMP)replaced_updatePresenceInfo, 
+                        (IMP *)&orig_updatePresenceInfo);
+        
+        NSLog(@"[DOMIDIOS] Hook aplicado con éxito en WAPresenceManager.");
+    } else {
+        NSLog(@"[DOMIDIOS] Error: No se encontró la clase WAPresenceManager.");
     }
 }
