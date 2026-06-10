@@ -12,27 +12,19 @@
 @end
 
 
-// --- DECLARACIÓN DE LA FUNCIÓN DE SUBSTRATE ---
-// Esto evita que el compilador dé error si no encuentra la librería de Substrate de golpe
-#ifdef __cplusplus
-extern "C" {
-#endif
-    void MSHookMessageEx(Class _class, SEL selector, IMP replacement, IMP *result);
-#ifdef __cplusplus
-}
-#endif
+// --- CATEGORÍA PARA EL SWIZZLING ---
+@interface NSObject (WhatsAppHook)
+- (void)custom_updatePresenceInfo:(WAPresenceInfo *)presenceInfo;
+@end
 
+@implementation NSObject (WhatsAppHook)
 
-// --- PUNTERO PARA GUARDAR EL MÉTODO ORIGINAL ---
-static void (*orig_updatePresenceInfo)(id self, SEL _cmd, WAPresenceInfo *presenceInfo);
+- (void)custom_updatePresenceInfo:(WAPresenceInfo *)presenceInfo {
+    // Debido al Swizzling, llamar a 'custom_updatePresenceInfo' aquí adentro
+    // en realidad ejecuta el método original de WhatsApp. No es un bucle infinito.
+    [self custom_updatePresenceInfo:presenceInfo];
 
-
-// --- NUESTRA FUNCIÓN REEMPLAZO (EL HOOK) ---
-static void replaced_updatePresenceInfo(id self, SEL _cmd, WAPresenceInfo *presenceInfo) {
-    // 1. Ejecutamos el método original obligatoriamente
-    orig_updatePresenceInfo(self, _cmd, presenceInfo);
-
-    // 2. Lógica para detectar el estado "En Línea"
+    // Lógica para detectar si el contacto está "En Línea"
     if (presenceInfo != nil && presenceInfo.userJID != nil) {
         NSString *phoneNumber = presenceInfo.userJID.user;
         unsigned long long status = presenceInfo.presence;
@@ -40,7 +32,7 @@ static void replaced_updatePresenceInfo(id self, SEL _cmd, WAPresenceInfo *prese
         // status == 1 significa "En Línea"
         if (status == 1) {
             
-            // Forzar ejecución en el hilo principal para la interfaz gráfica
+            // Ejecución segura en la interfaz gráfica (UI)
             dispatch_async(dispatch_get_main_queue(), ^{
                 
                 UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🚨 ¡CONTACTO EN LÍNEA! 🚨"
@@ -50,7 +42,7 @@ static void replaced_updatePresenceInfo(id self, SEL _cmd, WAPresenceInfo *prese
                 UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
                 [alert addAction:okAction];
                 
-                // Buscar la pantalla de enfrente para mostrar la alerta sin crasear
+                // Buscar la pantalla frontal activa para mostrar la alerta
                 UIViewController *rootVC = [[[UIApplication sharedApplication] keyWindow] rootViewController];
                 if (rootVC) {
                     while (rootVC.presentedViewController) {
@@ -60,29 +52,50 @@ static void replaced_updatePresenceInfo(id self, SEL _cmd, WAPresenceInfo *prese
                 }
             });
 
-            // Log en la consola del dispositivo
+            // Registro en la consola
             NSLog(@"[DOMIDIOS] Usuario online detectado: +%@", phoneNumber);
         }
     }
 }
 
+@end
 
-// --- CONSTRUCTOR: SE EJECUTA AL CARGAR EL DYLIB EN LA IPA ---
+
+// --- CONSTRUCTOR: INTERCAMBIA LOS MÉTODOS NATIVAMENTE ---
 __attribute__((constructor)) static void initialize_hooks() {
-    // Buscamos la clase dentro de WhatsApp
+    // Buscamos la clase original de WhatsApp
     Class targetClass = objc_getClass("WAPresenceManager");
     
     if (targetClass) {
-        SEL targetSelector = sel_registerName("updatePresenceInfo:");
+        SEL originalSelector = sel_registerName("updatePresenceInfo:");
+        SEL swizzledSelector = @selector(custom_updatePresenceInfo:);
         
-        // Aplicamos el Hook usando la API nativa de Substrate
-        MSHookMessageEx(targetClass, 
-                        targetSelector, 
-                        (IMP)replaced_updatePresenceInfo, 
-                        (IMP *)&orig_updatePresenceInfo);
+        Method originalMethod = class_getInstanceMethod(targetClass, originalSelector);
+        Method swizzledMethod = class_getInstanceMethod([NSObject class], swizzledSelector);
         
-        NSLog(@"[DOMIDIOS] Hook aplicado con éxito en WAPresenceManager.");
+        if (originalMethod && swizzledMethod) {
+            // Añadimos el método nuevo a la clase de WhatsApp si no existe
+            BOOL didAddMethod = class_addMethod(targetClass,
+                                                originalSelector,
+                                                method_getImplementation(swizzledMethod),
+                                                method_getTypeEncoding(swizzledMethod));
+            
+            if (didAddMethod) {
+                // Si se añadió, reemplazamos el método espejo
+                class_replaceMethod(targetClass,
+                                    swizzledSelector,
+                                    method_getImplementation(originalMethod),
+                                    method_getTypeEncoding(originalMethod));
+            } else {
+                // Si el método ya existía, simplemente intercambiamos sus implementaciones nativas
+                method_exchangeImplementations(originalMethod, swizzledMethod);
+            }
+            
+            NSLog(@"[DOMIDIOS] Swizzling aplicado con éxito de forma nativa.");
+        } else {
+            NSLog(@"[DOMIDIOS] Error: No se pudieron obtener los métodos.");
+        }
     } else {
-        NSLog(@"[DOMIDIOS] Error: No se encontró la clase WAPresenceManager.");
+        NSLog(@"[DOMIDIOS] Error: No se encontró la clase WAPresenceManager en este binario.");
     }
 }
